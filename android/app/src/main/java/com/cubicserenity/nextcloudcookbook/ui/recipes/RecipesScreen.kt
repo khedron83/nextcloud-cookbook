@@ -29,6 +29,7 @@ import com.cubicserenity.nextcloudcookbook.ui.home.RecipeCard
 fun RecipesScreen(
     onRecipeClick: (Int) -> Unit,
     onNewRecipe: () -> Unit,
+    onImportUrl: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: RecipesViewModel = hiltViewModel(),
@@ -36,11 +37,34 @@ fun RecipesScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     var searchActive by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
+    var showAddDialog by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
 
     LaunchedEffect(searchActive) {
         if (searchActive) focusRequester.requestFocus()
+    }
+
+    if (showAddDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddDialog = false },
+            title = { Text("Add Recipe") },
+            text = { Text("How would you like to add a recipe?") },
+            confirmButton = {
+                TextButton(onClick = { showAddDialog = false; onImportUrl() }) {
+                    Icon(Icons.Default.Link, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Import from URL")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddDialog = false; onNewRecipe() }) {
+                    Icon(Icons.Default.Edit, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Enter manually")
+                }
+            },
+        )
     }
 
     Scaffold(
@@ -101,7 +125,7 @@ fun RecipesScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onNewRecipe) {
+            FloatingActionButton(onClick = { showAddDialog = true }) {
                 Icon(Icons.Default.Add, "Add Recipe")
             }
         },

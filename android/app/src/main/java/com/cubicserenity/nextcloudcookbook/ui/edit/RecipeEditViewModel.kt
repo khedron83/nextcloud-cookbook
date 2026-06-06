@@ -34,6 +34,8 @@ data class EditUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val error: String? = null,
+    val importUrl: String = "",
+    val isImporting: Boolean = false,
 )
 
 @HiltViewModel
@@ -100,6 +102,37 @@ class RecipeEditViewModel @Inject constructor(
     }
     fun removeTool(index: Int) = _state.update {
         it.copy(tools = it.tools.toMutableList().also { l -> l.removeAt(index) })
+    }
+
+    fun importFromUrl(url: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            _state.update { it.copy(isImporting = true) }
+            try {
+                val recipe = repository.importFromUrl(url)
+                _state.update { _ ->
+                    EditUiState(
+                        id = null,
+                        name = recipe.name,
+                        description = recipe.description,
+                        url = recipe.url,
+                        recipeYield = recipe.recipeYield,
+                        prepTimeMin = parseDurationMinutes(recipe.prepTime),
+                        cookTimeMin = parseDurationMinutes(recipe.cookTime),
+                        totalTimeMin = parseDurationMinutes(recipe.totalTime),
+                        category = recipe.recipeCategory,
+                        keywords = recipe.keywords,
+                        ingredients = recipe.recipeIngredient,
+                        instructions = recipe.recipeInstructions,
+                        tools = recipe.tools,
+                        nutrition = recipe.nutrition ?: Nutrition(),
+                        isImporting = false,
+                    )
+                }
+                onSuccess()
+            } catch (e: Exception) {
+                _state.update { it.copy(isImporting = false, error = e.message) }
+            }
+        }
     }
 
     fun save(onSaved: (Int) -> Unit) {

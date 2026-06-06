@@ -22,9 +22,12 @@ fun RecipeEditScreen(
     recipeId: Int?,
     onSaved: (Int) -> Unit,
     onCancel: () -> Unit,
+    openImportDialog: Boolean = false,
     viewModel: RecipeEditViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var showImportDialog by remember { mutableStateOf(openImportDialog) }
+    var importUrl by remember { mutableStateOf("") }
 
     LaunchedEffect(recipeId) { viewModel.load(recipeId) }
 
@@ -36,6 +39,11 @@ fun RecipeEditScreen(
                     IconButton(onClick = onCancel) { Icon(Icons.Default.Close, "Cancel") }
                 },
                 actions = {
+                    if (recipeId == null) {
+                        IconButton(onClick = { showImportDialog = true }) {
+                            Icon(Icons.Default.Link, "Import from URL")
+                        }
+                    }
                     IconButton(onClick = { viewModel.save(onSaved) }, enabled = !state.isSaving) {
                         if (state.isSaving) CircularProgressIndicator(Modifier.size(20.dp))
                         else Icon(Icons.Default.Save, "Save")
@@ -221,6 +229,34 @@ fun RecipeEditScreen(
         }
     }
 
+    if (showImportDialog) {
+        AlertDialog(
+            onDismissRequest = { showImportDialog = false },
+            title = { Text("Import Recipe from URL") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (state.isImporting) CircularProgressIndicator()
+                    else OutlinedTextField(
+                        value = importUrl,
+                        onValueChange = { importUrl = it },
+                        label = { Text("Recipe URL") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.importFromUrl(importUrl) { showImportDialog = false } },
+                    enabled = importUrl.isNotBlank() && !state.isImporting,
+                ) { Text("Import") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showImportDialog = false }) { Text("Cancel") }
+            },
+        )
+    }
 }
 
 @Composable

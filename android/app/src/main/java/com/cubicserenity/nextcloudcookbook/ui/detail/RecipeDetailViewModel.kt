@@ -1,6 +1,5 @@
 package com.cubicserenity.nextcloudcookbook.ui.detail
 
-import android.view.WindowManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cubicserenity.nextcloudcookbook.data.repository.RecipeRepository
@@ -82,38 +81,31 @@ class RecipeDetailViewModel @Inject constructor(
     fun refetchRecipe() {
         val recipe = _state.value.recipe ?: return
         val url = recipe.url.takeIf { it.isNotBlank() } ?: return
+        val existingId = recipe.id ?: return
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             try {
-                // Import creates a temp recipe with parsed data
                 val fetched = repository.importFromUrl(url)
-                val tempId = fetched.id
+                val tempId = fetched.id ?: return@launch
 
-                // Copy parsed content into existing recipe
-                recipe.name = fetched.name
-                recipe.description = fetched.description
-                recipe.recipeYield = fetched.recipeYield
-                recipe.prepTime = fetched.prepTime
-                recipe.cookTime = fetched.cookTime
-                recipe.totalTime = fetched.totalTime
-                recipe.recipeIngredient = fetched.recipeIngredient
-                recipe.recipeInstructions = fetched.recipeInstructions
-                recipe.recipeTool = fetched.recipeTool
-                recipe.nutrition = fetched.nutrition
-                recipe.keywords = fetched.keywords
+                val updated = recipe.copy(
+                    name = fetched.name,
+                    description = fetched.description,
+                    recipeYield = fetched.recipeYield,
+                    prepTime = fetched.prepTime,
+                    cookTime = fetched.cookTime,
+                    totalTime = fetched.totalTime,
+                    recipeIngredient = fetched.recipeIngredient,
+                    recipeInstructions = fetched.recipeInstructions,
+                    tools = fetched.tools,
+                    nutrition = fetched.nutrition,
+                    keywords = fetched.keywords,
+                )
 
-                // Delete the temporary recipe that was created
                 repository.deleteRecipe(tempId)
-
-                // Update original recipe with new content
-                repository.updateRecipe(recipe)
-                val updated = repository.getRecipe(recipe.id)
-                _state.update {
-                    it.copy(
-                        recipe = updated,
-                        isLoading = false,
-                    )
-                }
+                repository.updateRecipe(updated)
+                val refreshed = repository.getRecipe(existingId)
+                _state.update { it.copy(recipe = refreshed, isLoading = false) }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, error = "Failed to refetch: ${e.message}") }
             }

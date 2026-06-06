@@ -20,6 +20,7 @@ data class RecipesUiState(
     val isLoading: Boolean = false,
     val isOffline: Boolean = false,
     val error: String? = null,
+    val isUnconfigured: Boolean = false,
 ) {
     val filtered: List<RecipeSummary> get() = if (query.isBlank()) all
         else all.filter { query.lowercase() in it.name.lowercase() || query.lowercase() in it.keywords.lowercase() }
@@ -35,12 +36,20 @@ class RecipesViewModel @Inject constructor(
     val state: StateFlow<RecipesUiState> = _state.asStateFlow()
 
     init {
-        viewModelScope.launch { prefs.serverConfig.collect { _state.update { s -> s.copy(serverUrl = it.serverUrl) } } }
+        viewModelScope.launch {
+            prefs.serverConfig.collect { config ->
+                val unconfigured = config.serverUrl.isBlank() || config.username.isBlank()
+                _state.update { it.copy(serverUrl = config.serverUrl, isUnconfigured = unconfigured) }
+                if (!unconfigured && _state.value.all.isEmpty() && !_state.value.isLoading) {
+                    refresh()
+                }
+            }
+        }
         viewModelScope.launch { repository.cachedSummaries.collect { _state.update { s -> s.copy(all = it) } } }
-        refresh()
     }
 
     fun refresh() {
+        if (_state.value.isUnconfigured) return
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             try {

@@ -2,6 +2,7 @@ package com.cubicserenity.nextcloudcookbook.ui.recipes
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -106,6 +107,21 @@ fun RecipesScreen(
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
+            if (state.isUnconfigured) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Icon(Icons.Default.Cloud, null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.secondary)
+                        Text("No server configured", style = MaterialTheme.typography.titleMedium)
+                        Text("Add your Nextcloud details to get started.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+                        Button(onClick = onOpenSettings) {
+                            Icon(Icons.Default.Settings, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Open Settings")
+                        }
+                    }
+                }
+                return@Column
+            }
             if (state.isOffline) {
                 OfflineBanner(error = state.error, onRetry = viewModel::refresh)
             }

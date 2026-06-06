@@ -22,10 +22,11 @@ fun RecipeEditScreen(
     recipeId: Int?,
     onSaved: (Int) -> Unit,
     onCancel: () -> Unit,
+    openImportDialog: Boolean = false,
     viewModel: RecipeEditViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    var showImportDialog by remember { mutableStateOf(false) }
+    var showImportDialog by remember { mutableStateOf(openImportDialog) }
     var importUrl by remember { mutableStateOf("") }
 
     LaunchedEffect(recipeId) { viewModel.load(recipeId) }

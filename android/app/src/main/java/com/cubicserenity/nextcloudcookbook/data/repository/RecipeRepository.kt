@@ -79,10 +79,15 @@ class RecipeRepository @Inject constructor(
     suspend fun getCategories(): List<String> =
         api().getCategories().mapNotNull { it.name }.filter { it.isNotBlank() }
 
-    suspend fun getCategoriesWithCounts(): List<Pair<String, Int>> =
-        api().getCategories()
+    suspend fun getCategoriesWithCounts(): List<Pair<String, Int>> {
+        val raw = api().getCategories()
+        val named = raw
             .mapNotNull { dto -> dto.name?.takeIf { it.isNotBlank() && it != "*" }?.let { it to (dto.recipeCount ?: 0) } }
             .sortedBy { it.first }
+        val uncategorisedCount = raw.find { it.name == "*" }?.recipeCount ?: 0
+        return if (uncategorisedCount > 0) named + ("Uncategorised" to uncategorisedCount)
+        else named
+    }
 
     suspend fun getCategoryRecipes(category: String): List<RecipeSummary> =
         api().getCategoryRecipes(category).map { it.toDomain() }

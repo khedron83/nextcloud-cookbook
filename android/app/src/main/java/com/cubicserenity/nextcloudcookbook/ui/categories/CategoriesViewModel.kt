@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+private const val UNCATEGORISED = "Uncategorised"
+
 data class CategoriesUiState(
     val categories: List<Pair<String, Int>> = emptyList(),
     val selectedCategory: String? = null,
@@ -59,8 +61,8 @@ class CategoriesViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
             try {
-                val recipes = if (category == "Uncategorised")
-                    allRecipes.filter { it.category.isBlank() }
+                val recipes = if (category == UNCATEGORISED)
+                    loadUncategorised()
                 else
                     repository.getCategoryRecipes(category)
                 _state.update { it.copy(isLoading = false, categoryRecipes = recipes) }
@@ -68,6 +70,19 @@ class CategoriesViewModel @Inject constructor(
                 _state.update { it.copy(isLoading = false) }
             }
         }
+    }
+
+    private suspend fun loadUncategorised(): List<RecipeSummary> {
+        val namedCategories = _state.value.categories
+            .map { it.first }
+            .filter { it != UNCATEGORISED }
+        val categorisedIds = mutableSetOf<Int>()
+        for (cat in namedCategories) {
+            runCatching { repository.getCategoryRecipes(cat) }
+                .getOrNull()
+                ?.forEach { categorisedIds.add(it.id) }
+        }
+        return allRecipes.filter { it.id !in categorisedIds }
     }
 
     fun renameCategory(oldName: String, newName: String) {

@@ -396,21 +396,29 @@ class MainWindow(QMainWindow):
             return
         self.statusBar().showMessage(f"Refetching {self._current.name} from URL…")
         def _do_refetch():
-            # Import fresh content from URL (creates temp recipe)
-            fetched = self._client.import_recipe(self._current.url)
-            # Copy new content to existing recipe, preserving the ID
-            self._current.name = fetched.name
-            self._current.description = fetched.description
-            self._current.recipe_yield = fetched.recipe_yield
-            self._current.prep_time = fetched.prep_time
-            self._current.cook_time = fetched.cook_time
-            self._current.total_time = fetched.total_time
-            self._current.recipe_ingredient = fetched.recipe_ingredient
-            self._current.recipe_instructions = fetched.recipe_instructions
-            self._current.recipe_tool = fetched.recipe_tool
-            self._current.nutrition = fetched.nutrition
-            self._current.keywords = fetched.keywords
-            # Update the existing recipe (don't create new)
+            # Import creates a temp recipe with parsed data
+            fetched_dict = self._client.import_recipe(self._current.url)
+            temp_id = fetched_dict.get("recipeId")
+
+            # Get full details of temp recipe
+            if temp_id:
+                temp_recipe = self._client.get_recipe(temp_id)
+                # Copy parsed content to existing recipe
+                self._current.name = temp_recipe.get("name", self._current.name)
+                self._current.description = temp_recipe.get("description", "")
+                self._current.recipe_yield = temp_recipe.get("recipeYield", "")
+                self._current.prep_time = temp_recipe.get("prepTime", "")
+                self._current.cook_time = temp_recipe.get("cookTime", "")
+                self._current.total_time = temp_recipe.get("totalTime", "")
+                self._current.recipe_ingredient = temp_recipe.get("recipeIngredient", [])
+                self._current.recipe_instructions = temp_recipe.get("recipeInstructions", [])
+                self._current.recipe_tool = temp_recipe.get("tool", [])
+                self._current.nutrition = temp_recipe.get("nutrition", {})
+                self._current.keywords = temp_recipe.get("keywords", "")
+                # Delete the temporary recipe
+                self._client.delete_recipe(temp_id)
+
+            # Update original recipe with new content
             return self._client.update_recipe(self._current)
         def _on_refetch(_):
             self.statusBar().showMessage(f"Refetched {self._current.name}")

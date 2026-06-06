@@ -39,6 +39,7 @@ class MainWindow(QMainWindow):
         self._ing_index: IngredientIndex | None = None
         self._active_category: object = None
         self._offline: bool = False
+        self._category_names: list[str] = []
         self._build_ui()
         self._init()
 
@@ -138,6 +139,7 @@ class MainWindow(QMainWindow):
         self._view.back_requested.connect(self._back_to_grid)
         self._view.edit_requested.connect(self._edit_current)
         self._view.delete_requested.connect(self._delete_current)
+        self._view.refetch_requested.connect(self._refetch_current)
         self._view.keyword_clicked.connect(self._on_keyword_filter)
         self._stack.addWidget(self._view)           # _VIEW = 1
 
@@ -236,15 +238,40 @@ class MainWindow(QMainWindow):
 
     def _on_categories_loaded(self, data: list):
         self._sidebar.set_categories(data)
+        self._category_names = [
+            (item.get("name") if isinstance(item, dict) else item)
+            for item in data
+            if (item.get("name") if isinstance(item, dict) else item) not in ("", "*", None)
+        ]
 
     def _on_category(self, key):
         self._active_category = key
         if key is None:
-            # All recipes — use cached list
             self._show_summaries(self._all_recipes)
+        elif key == "*":
+            self._load_uncategorised()
         else:
-            # Server-side category filter
             self._run(self._client.get_category_recipes, self._on_category_recipes, key)
+
+    def _load_uncategorised(self):
+        """Fetch all named category recipe IDs then show what's left."""
+        all_recipes = list(self._all_recipes)
+        categories = list(self._category_names)
+        client = self._client
+        self.statusBar().showMessage("Loading uncategorised…")
+
+        def _fetch():
+            categorised_ids: set[int] = set()
+            for cat in categories:
+                try:
+                    for item in client.get_category_recipes(cat):
+                        rid = item.get("recipe_id", item.get("id", 0))
+                        categorised_ids.add(rid)
+                except Exception:
+                    pass
+            return [r for r in all_recipes if r.recipe_id not in categorised_ids]
+
+        self._run(_fetch, self._show_summaries)
 
     def _on_category_recipes(self, data: list):
         summaries = [
@@ -363,6 +390,19 @@ class MainWindow(QMainWindow):
         self._current = None
         self._run(self._client.delete_recipe, lambda _: self._load(), rid)
         self._stack.setCurrentIndex(_GRID)
+
+    def _refetch_current(self):
+        if not self._current or not self._client or not self._current.url:
+            return
+        self.statusBar().showMessage(f"Refetching {self._current.name} from URL…")
+        def _do_refetch():
+            fetched = self._client.import_recipe(self._current.url)
+            fetched.id = self._current.id
+            return self._client.update_recipe(fetched)
+        def _on_refetch(_):
+            self.statusBar().showMessage(f"Refetched {self._current.name}")
+            self._load()
+        self._run(_do_refetch, _on_refetch)
 
     def _save_recipe(self, recipe: Recipe):
         if not self._client:

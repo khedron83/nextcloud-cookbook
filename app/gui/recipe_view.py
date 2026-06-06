@@ -114,6 +114,7 @@ class RecipeView(QWidget):
     back_requested   = Signal()
     edit_requested   = Signal()
     delete_requested = Signal()
+    refetch_requested = Signal()
     keyword_clicked  = Signal(str)
 
     def __init__(self, parent=None):
@@ -147,13 +148,15 @@ class RecipeView(QWidget):
         bl.addSpacing(12)
         self._edit_btn = QPushButton("Edit")
         self._edit_btn.clicked.connect(self.edit_requested)
+        self._refetch_btn = QPushButton("Refetch from URL")
+        self._refetch_btn.clicked.connect(self.refetch_requested)
         self._del_btn = QPushButton("Delete")
         self._del_btn.setStyleSheet("color: #c0392b;")
         self._del_btn.clicked.connect(self.delete_requested)
         self._convert_btn = QPushButton("Convert to Metric")
         self._convert_btn.setCheckable(True)
         self._convert_btn.toggled.connect(self._on_convert_toggled)
-        for btn in (self._edit_btn, self._convert_btn, self._del_btn):
+        for btn in (self._edit_btn, self._refetch_btn, self._convert_btn, self._del_btn):
             bl.addWidget(btn)
         outer.addWidget(bar)
 
@@ -358,6 +361,7 @@ class RecipeView(QWidget):
             self._meta_grid.addWidget(url_lbl, row, 2)
             row += 1
         self._meta_frame.setVisible(row > 0)
+        self._refetch_btn.setVisible(bool(recipe.url))
 
         # Description
         self._desc.setText(recipe.description)

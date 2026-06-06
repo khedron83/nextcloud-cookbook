@@ -36,6 +36,7 @@ fun RecipeDetailScreen(
     val context = LocalContext.current
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
+    var showRefetchDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(recipeId) { viewModel.load(recipeId) }
 
@@ -50,6 +51,20 @@ fun RecipeDetailScreen(
                 }
             },
             dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") } },
+        )
+    }
+
+    if (showRefetchDialog) {
+        AlertDialog(
+            onDismissRequest = { showRefetchDialog = false },
+            title = { Text("Refetch recipe") },
+            text = { Text("Download the latest content from the source URL?") },
+            confirmButton = {
+                TextButton(onClick = { showRefetchDialog = false; viewModel.refetchRecipe() }) {
+                    Text("Refetch")
+                }
+            },
+            dismissButton = { TextButton(onClick = { showRefetchDialog = false }) { Text("Cancel") } },
         )
     }
 
@@ -93,6 +108,13 @@ fun RecipeDetailScreen(
                             Icon(Icons.Default.MoreVert, "More")
                         }
                         DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
+                            if (!state.recipe?.url.isNullOrBlank()) {
+                                DropdownMenuItem(
+                                    text = { Text("Refetch from URL") },
+                                    leadingIcon = { Icon(Icons.Default.Refresh, null) },
+                                    onClick = { showMoreMenu = false; showRefetchDialog = true },
+                                )
+                            }
                             DropdownMenuItem(
                                 text = { Text("Delete recipe", color = MaterialTheme.colorScheme.error) },
                                 leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },

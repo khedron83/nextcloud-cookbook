@@ -85,9 +85,22 @@ class RecipeDetailViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             try {
+                // Import fresh content from URL
                 val fetched = repository.importFromUrl(url)
-                fetched.id = recipe.id
-                repository.updateRecipe(fetched)
+                // Copy content into existing recipe, preserving ID
+                recipe.name = fetched.name
+                recipe.description = fetched.description
+                recipe.recipeYield = fetched.recipeYield
+                recipe.prepTime = fetched.prepTime
+                recipe.cookTime = fetched.cookTime
+                recipe.totalTime = fetched.totalTime
+                recipe.recipeIngredient = fetched.recipeIngredient
+                recipe.recipeInstructions = fetched.recipeInstructions
+                recipe.recipeTool = fetched.recipeTool
+                recipe.nutrition = fetched.nutrition
+                recipe.keywords = fetched.keywords
+                // Update existing recipe (don't create new)
+                repository.updateRecipe(recipe)
                 val updated = repository.getRecipe(recipe.id)
                 _state.update {
                     it.copy(

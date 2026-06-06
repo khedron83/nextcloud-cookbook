@@ -396,9 +396,22 @@ class MainWindow(QMainWindow):
             return
         self.statusBar().showMessage(f"Refetching {self._current.name} from URL…")
         def _do_refetch():
+            # Import fresh content from URL (creates temp recipe)
             fetched = self._client.import_recipe(self._current.url)
-            fetched.id = self._current.id
-            return self._client.update_recipe(fetched)
+            # Copy new content to existing recipe, preserving the ID
+            self._current.name = fetched.name
+            self._current.description = fetched.description
+            self._current.recipe_yield = fetched.recipe_yield
+            self._current.prep_time = fetched.prep_time
+            self._current.cook_time = fetched.cook_time
+            self._current.total_time = fetched.total_time
+            self._current.recipe_ingredient = fetched.recipe_ingredient
+            self._current.recipe_instructions = fetched.recipe_instructions
+            self._current.recipe_tool = fetched.recipe_tool
+            self._current.nutrition = fetched.nutrition
+            self._current.keywords = fetched.keywords
+            # Update the existing recipe (don't create new)
+            return self._client.update_recipe(self._current)
         def _on_refetch(_):
             self.statusBar().showMessage(f"Refetched {self._current.name}")
             self._load()

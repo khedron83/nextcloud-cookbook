@@ -25,17 +25,18 @@ class _CardDelegate(QStyledItemDelegate):
         painter.save()
         r = option.rect
         selected = bool(option.state & QStyle.StateFlag.State_Selected)
-        palette = option.palette
 
         # Card background + border
-        bg = palette.highlight().color() if selected else palette.base().color()
-        painter.fillRect(r, bg)
-        border = palette.highlight().color() if selected else palette.mid().color()
+        bg     = QColor("#1d3461") if selected else QColor("#1e2a3a")
+        border = QColor("#2563eb") if selected else QColor("#2d3f55")
+        painter.fillRect(r, QColor("#111827"))  # gap between cards
+        painter.fillRect(r.adjusted(2, 2, -2, -2), bg)
         painter.setPen(QPen(border, 1))
-        painter.drawRoundedRect(r.adjusted(1, 1, -2, -2), 6, 6)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.drawRoundedRect(r.adjusted(2, 2, -3, -3), 8, 8)
 
         # Image area (top portion)
-        img_rect = QRect(r.x() + 1, r.y() + 1, CARD_W - 2, THUMB_H)
+        img_rect = QRect(r.x() + 2, r.y() + 2, CARD_W - 4, THUMB_H)
         thumb: QPixmap | None = index.data(_ROLE_THUMB)
         if thumb and not thumb.isNull():
             scaled = thumb.scaled(
@@ -49,16 +50,16 @@ class _CardDelegate(QStyledItemDelegate):
             painter.drawPixmap(ox, oy, scaled)
             painter.setClipping(False)
         else:
-            painter.fillRect(img_rect, palette.midlight())
+            painter.fillRect(img_rect, QColor("#243447"))
             f = QFont()
             f.setPointSize(28)
             painter.setFont(f)
-            painter.setPen(palette.mid().color())
+            painter.setPen(QColor("#374151"))
             painter.drawText(img_rect, Qt.AlignmentFlag.AlignCenter, "🍽")
 
         # Text area (below image)
-        text_color  = palette.highlightedText().color() if selected else palette.text().color()
-        muted_color = palette.highlightedText().color() if selected else QColor("#888")
+        text_color  = QColor("#93c5fd") if selected else QColor("#e2e8f0")
+        muted_color = QColor("#93c5fd") if selected else QColor("#64748b")
 
         text_y = r.y() + THUMB_H + 8
         name = index.data(Qt.ItemDataRole.DisplayRole) or ""
@@ -122,7 +123,7 @@ class RecipeGrid(QWidget):
         self._sort.setToolTip("Sort order")
         self._sort.currentIndexChanged.connect(self._apply_filter)
         self._count_label = QLabel()
-        self._count_label.setStyleSheet("color: #888;")
+        self._count_label.setObjectName("countLabel")
         bar.addWidget(self._search)
         bar.addWidget(self._mode)
         bar.addWidget(self._sort)

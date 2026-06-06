@@ -24,6 +24,119 @@ from app.gui.meal_planner import MealPlannerView
 
 _GRID, _VIEW, _EDIT, _PLANNER = 0, 1, 2, 3
 
+_STYLE = """
+/* ── Base ────────────────────────────────────────────────────────── */
+QMainWindow, QDialog { background: #111827; color: #e2e8f0; }
+QWidget { color: #e2e8f0; font-size: 13px; }
+QLabel  { background: transparent; color: #e2e8f0; }
+
+/* ── Sidebar ─────────────────────────────────────────────────────── */
+QWidget#sidebar { background: #1e2a3a; }
+QWidget#sidebar QListWidget {
+    background: transparent; border: none;
+    color: #c8d8e8; padding: 4px 8px; outline: 0;
+}
+QWidget#sidebar QListWidget::item {
+    padding: 9px 10px; border-radius: 6px; margin: 1px 0;
+}
+QWidget#sidebar QListWidget::item:selected { background: #2563eb; color: white; }
+QWidget#sidebar QListWidget::item:hover:!selected { background: rgba(255,255,255,0.07); }
+
+/* ── Splitter ────────────────────────────────────────────────────── */
+QSplitter::handle:horizontal { background: #243447; width: 1px; }
+
+/* ── Action bar ──────────────────────────────────────────────────── */
+QWidget#actionBar { background: #1e2a3a; border-bottom: 1px solid #243447; }
+
+/* ── Recipe grid list ────────────────────────────────────────────── */
+QListWidget { background: #111827; border: none; outline: 0; color: #e2e8f0; }
+QListWidget::item:selected       { background: #1d3461; color: #93c5fd; }
+QListWidget::item:hover:!selected { background: #1e2a3a; }
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+QPushButton {
+    background: #2563eb; color: white; border: none;
+    border-radius: 7px; padding: 7px 16px;
+    font-size: 13px; font-weight: 500;
+}
+QPushButton:hover   { background: #1d4ed8; color: white; }
+QPushButton:pressed { background: #1e40af; color: white; }
+QPushButton:disabled { background: #243447; color: #64748b; border: 1px solid #2d3f55; }
+QPushButton:checked       { background: #15803d; color: white; }
+QPushButton:checked:hover { background: #16a34a; color: white; }
+QPushButton#backBtn { background: transparent; color: #94a3b8; border: 1px solid #2d3f55; }
+QPushButton#backBtn:hover { background: #1e2a3a; color: #e2e8f0; }
+QPushButton#editBtn       { background: #0e7490; color: white; }
+QPushButton#editBtn:hover { background: #0891b2; color: white; }
+QPushButton#deleteBtn       { background: #b91c1c; color: white; }
+QPushButton#deleteBtn:hover { background: #dc2626; color: white; }
+
+/* ── Inputs ──────────────────────────────────────────────────────── */
+QLineEdit, QTextEdit, QPlainTextEdit {
+    background: #1e2a3a; border: 1px solid #2d3f55; border-radius: 6px;
+    padding: 6px 10px; color: #e2e8f0; selection-background-color: #1d3461;
+}
+QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus { border-color: #2563eb; }
+QSpinBox, QDoubleSpinBox {
+    background: #1e2a3a; border: 1px solid #2d3f55; border-radius: 6px;
+    padding: 4px 8px; color: #e2e8f0;
+}
+QSpinBox:focus, QDoubleSpinBox:focus { border-color: #2563eb; }
+QSpinBox::up-button, QSpinBox::down-button { background: #2d3f55; border: none; width: 18px; }
+QSpinBox::up-button:hover, QSpinBox::down-button:hover { background: #374151; }
+QComboBox {
+    background: #1e2a3a; border: 1px solid #2d3f55; border-radius: 6px;
+    padding: 5px 10px; color: #e2e8f0;
+}
+QComboBox:focus { border-color: #2563eb; }
+QComboBox::drop-down { border: none; width: 22px; }
+QComboBox QAbstractItemView {
+    background: #1e2a3a; border: 1px solid #2d3f55; color: #e2e8f0;
+    selection-background-color: #2563eb; outline: 0;
+}
+
+/* ── Group boxes ─────────────────────────────────────────────────── */
+QGroupBox {
+    border: 1px solid #243447; border-radius: 8px;
+    margin-top: 12px; padding-top: 8px;
+    color: #e2e8f0; background: transparent;
+}
+QGroupBox::title {
+    subcontrol-origin: margin; left: 12px; padding: 0 6px;
+    color: #64748b; font-size: 11px; font-weight: bold;
+}
+
+/* ── Scroll bars ─────────────────────────────────────────────────── */
+QScrollBar:vertical   { background: #111827; width: 8px;  margin: 0; }
+QScrollBar:horizontal { background: #111827; height: 8px; margin: 0; }
+QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
+    background: #374151; border-radius: 4px; min-height: 24px; min-width: 24px;
+}
+QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover { background: #4b5563; }
+QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; }
+
+/* ── Menus ───────────────────────────────────────────────────────── */
+QMenuBar { background: #1e2a3a; color: #c8d8e8; padding: 2px; border-bottom: 1px solid #243447; }
+QMenuBar::item:selected { background: #2d3f55; border-radius: 4px; }
+QMenu { background: #1e2a3a; color: #c8d8e8; border: 1px solid #2d3f55; border-radius: 6px; padding: 4px; }
+QMenu::item { padding: 6px 24px 6px 12px; border-radius: 4px; }
+QMenu::item:selected { background: #2563eb; color: white; }
+QMenu::separator { background: #2d3f55; height: 1px; margin: 4px 8px; }
+
+/* ── Status bar ──────────────────────────────────────────────────── */
+QStatusBar { background: #1e2a3a; color: #64748b; border-top: 1px solid #243447; font-size: 12px; padding: 2px 8px; }
+QStatusBar::item { border: none; }
+
+/* ── Misc ────────────────────────────────────────────────────────── */
+QCheckBox { color: #c8d8e8; spacing: 8px; }
+QCheckBox::indicator { width: 16px; height: 16px; border: 1px solid #2d3f55; border-radius: 4px; background: #1e2a3a; }
+QCheckBox::indicator:checked { background: #2563eb; border-color: #2563eb; }
+QFrame[frameShape="4"], QFrame[frameShape="5"] { color: #243447; }
+QScrollArea { background: #111827; border: none; }
+QScrollArea > QWidget > QWidget { background: #111827; }
+QLabel#countLabel { color: #64748b; }
+"""
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -31,6 +144,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Nextcloud Cookbook")
         self.setMinimumSize(900, 600)
         self.resize(1280, 780)
+        self.setStyleSheet(_STYLE)
         self._client: CookbookClient | None = None
         self._current: Recipe | None = None
         self._all_recipes: list[RecipeSummary] = []
@@ -39,6 +153,7 @@ class MainWindow(QMainWindow):
         self._ing_index: IngredientIndex | None = None
         self._active_category: object = None
         self._offline: bool = False
+        self._stay_on_view: bool = False
         self._category_names: list[str] = []
         self._build_ui()
         self._init()
@@ -121,6 +236,7 @@ class MainWindow(QMainWindow):
 
         # Left: category sidebar
         self._sidebar = CategorySidebar()
+        self._sidebar.setObjectName("sidebar")
         self._sidebar.setMinimumWidth(180)
         self._sidebar.setMaximumWidth(280)
         self._sidebar.category_selected.connect(self._on_category)
@@ -139,7 +255,6 @@ class MainWindow(QMainWindow):
         self._view.back_requested.connect(self._back_to_grid)
         self._view.edit_requested.connect(self._edit_current)
         self._view.delete_requested.connect(self._delete_current)
-        self._view.refetch_requested.connect(self._refetch_current)
         self._view.keyword_clicked.connect(self._on_keyword_filter)
         self._stack.addWidget(self._view)           # _VIEW = 1
 
@@ -220,6 +335,7 @@ class MainWindow(QMainWindow):
     def _start_ingredient_index(self):
         if self._ing_index and self._ing_index.isRunning():
             self._ing_index.stop()
+            self._ing_index.wait()
         ids = [r.recipe_id for r in self._all_recipes]
         self._ing_index = IngredientIndex(self._client, ids)
         self._ing_index.progress.connect(self._on_index_progress)
@@ -288,7 +404,9 @@ class MainWindow(QMainWindow):
     def _show_summaries(self, recipes: list):
         self._grid.set_recipes(recipes)
         self._planner_act.setChecked(False)
-        self._stack.setCurrentIndex(_GRID)
+        if not self._stay_on_view:
+            self._stack.setCurrentIndex(_GRID)
+        self._stay_on_view = False
         self._start_thumbnail_loader([r.recipe_id for r in recipes])
 
     def _start_thumbnail_loader(self, ids: list[int]):
@@ -391,40 +509,6 @@ class MainWindow(QMainWindow):
         self._run(self._client.delete_recipe, lambda _: self._load(), rid)
         self._stack.setCurrentIndex(_GRID)
 
-    def _refetch_current(self):
-        if not self._current or not self._client or not self._current.url:
-            return
-        self.statusBar().showMessage(f"Refetching {self._current.name} from URL…")
-        def _do_refetch():
-            # Import creates a temp recipe with parsed data
-            fetched_dict = self._client.import_recipe(self._current.url)
-            temp_id = fetched_dict.get("recipeId")
-
-            # Get full details of temp recipe
-            if temp_id:
-                temp_recipe = self._client.get_recipe(temp_id)
-                # Copy parsed content to existing recipe
-                self._current.name = temp_recipe.get("name", self._current.name)
-                self._current.description = temp_recipe.get("description", "")
-                self._current.recipe_yield = temp_recipe.get("recipeYield", "")
-                self._current.prep_time = temp_recipe.get("prepTime", "")
-                self._current.cook_time = temp_recipe.get("cookTime", "")
-                self._current.total_time = temp_recipe.get("totalTime", "")
-                self._current.recipe_ingredient = temp_recipe.get("recipeIngredient", [])
-                self._current.recipe_instructions = temp_recipe.get("recipeInstructions", [])
-                self._current.recipe_tool = temp_recipe.get("tool", [])
-                self._current.nutrition = temp_recipe.get("nutrition", {})
-                self._current.keywords = temp_recipe.get("keywords", "")
-                # Delete the temporary recipe
-                self._client.delete_recipe(temp_id)
-
-            # Update original recipe with new content
-            return self._client.update_recipe(self._current)
-        def _on_refetch(_):
-            self.statusBar().showMessage(f"Refetched {self._current.name}")
-            self._load()
-        self._run(_do_refetch, _on_refetch)
-
     def _save_recipe(self, recipe: Recipe):
         if not self._client:
             return
@@ -445,6 +529,7 @@ class MainWindow(QMainWindow):
         self._current = Recipe.from_api(data)
         self._view.set_recipe(self._current)
         self._stack.setCurrentIndex(_VIEW)
+        self._stay_on_view = True
         self._load()
         self.statusBar().showMessage(f"Saved: {self._current.name}")
         if self._current.id:
@@ -465,7 +550,15 @@ class MainWindow(QMainWindow):
                 return
             url = url.strip()
         self.statusBar().showMessage(f"Importing from {url}…")
-        self._run(self._client.import_recipe, self._on_saved, url)
+        self._run(self._client.import_recipe, self._on_imported, url)
+
+    def _on_imported(self, data: dict):
+        recipe_id = data.get("recipeId") or data.get("id")
+        if recipe_id:
+            self._run(self._client.get_recipe, self._on_saved_fetched, recipe_id)
+        else:
+            self._load()
+            self.statusBar().showMessage("Recipe imported.")
 
     def _export_zip(self):
         if not self._client:

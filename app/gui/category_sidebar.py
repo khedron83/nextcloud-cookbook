@@ -114,7 +114,7 @@ class CategorySidebar(QWidget):
             f.setPointSize(8)
             f.setBold(True)
             item.setFont(f)
-            item.setForeground(QColor("#888"))
+            item.setForeground(QColor("#64748b"))
             item.setText(f"  {label.upper()}")
             item.setSizeHint(QSize(0, 28))
         else:

@@ -82,7 +82,7 @@ class _ScaledImage(QLabel):
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setMinimumSize(200, 180)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.setStyleSheet("background: palette(midlight); border-radius: 6px;")
+        self.setStyleSheet("background: #1e2a3a; border-radius: 8px;")
 
     def set_pixmap(self, px: QPixmap):
         self._source = px
@@ -91,7 +91,7 @@ class _ScaledImage(QLabel):
     def clear_pixmap(self):
         self._source = None
         self.clear()
-        self.setStyleSheet("background: palette(midlight); border-radius: 6px;")
+        self.setStyleSheet("background: #1e2a3a; border-radius: 8px;")
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -114,7 +114,6 @@ class RecipeView(QWidget):
     back_requested   = Signal()
     edit_requested   = Signal()
     delete_requested = Signal()
-    refetch_requested = Signal()
     keyword_clicked  = Signal(str)
 
     def __init__(self, parent=None):
@@ -132,9 +131,11 @@ class RecipeView(QWidget):
 
         # ── Action bar ────────────────────────────────────────────────────────
         bar = QWidget()
+        bar.setObjectName("actionBar")
         bl = QHBoxLayout(bar)
-        bl.setContentsMargins(8, 4, 8, 4)
+        bl.setContentsMargins(12, 6, 12, 6)
         back_btn = QPushButton("← Back")
+        back_btn.setObjectName("backBtn")
         back_btn.clicked.connect(self.back_requested)
         bl.addWidget(back_btn)
         bl.addStretch()
@@ -147,16 +148,15 @@ class RecipeView(QWidget):
         bl.addWidget(self._servings_spin)
         bl.addSpacing(12)
         self._edit_btn = QPushButton("Edit")
+        self._edit_btn.setObjectName("editBtn")
         self._edit_btn.clicked.connect(self.edit_requested)
-        self._refetch_btn = QPushButton("Refetch from URL")
-        self._refetch_btn.clicked.connect(self.refetch_requested)
         self._del_btn = QPushButton("Delete")
-        self._del_btn.setStyleSheet("color: #c0392b;")
+        self._del_btn.setObjectName("deleteBtn")
         self._del_btn.clicked.connect(self.delete_requested)
         self._convert_btn = QPushButton("Convert to Metric")
         self._convert_btn.setCheckable(True)
         self._convert_btn.toggled.connect(self._on_convert_toggled)
-        for btn in (self._edit_btn, self._refetch_btn, self._convert_btn, self._del_btn):
+        for btn in (self._edit_btn, self._convert_btn, self._del_btn):
             bl.addWidget(btn)
         outer.addWidget(bar)
 
@@ -211,9 +211,8 @@ class RecipeView(QWidget):
         self._meta_frame = QFrame()
         self._meta_frame.setFrameShape(QFrame.Shape.StyledPanel)
         self._meta_frame.setStyleSheet(
-            "QFrame { border-radius: 6px; background: palette(alternateBase); "
-            "border: 1px solid palette(mid); } "
-            "QLabel { border: none; background: transparent; }"
+            "QFrame { border-radius: 8px; background: #1e2a3a; border: 1px solid #243447; } "
+            "QLabel { border: none; background: transparent; color: #e2e8f0; }"
         )
         self._meta_grid = QGridLayout(self._meta_frame)
         self._meta_grid.setContentsMargins(12, 10, 12, 10)
@@ -229,7 +228,7 @@ class RecipeView(QWidget):
         # ── Description ───────────────────────────────────────────────────────
         self._desc = QLabel()
         self._desc.setWordWrap(True)
-        self._desc.setStyleSheet("color: palette(windowText); font-size: 13px;")
+        self._desc.setStyleSheet("color: #c8d8e8; font-size: 13px; line-height: 1.5;")
         cl.addWidget(self._desc)
 
         # ── Bottom: ingredients + instructions side by side ───────────────────
@@ -275,10 +274,10 @@ class RecipeView(QWidget):
     def _chip(self, text: str) -> QPushButton:
         btn = QPushButton(text)
         btn.setStyleSheet(
-            "QPushButton { background: palette(button); color: palette(buttonText);"
-            "  border: 1px solid palette(mid); border-radius: 10px;"
-            "  padding: 2px 9px; font-size: 11px; }"
-            "QPushButton:hover { background: palette(highlight); color: palette(highlightedText); border-color: palette(highlight); }"
+            "QPushButton { background: #1e2a3a; color: #94a3b8;"
+            "  border: 1px solid #2d3f55; border-radius: 10px;"
+            "  padding: 3px 10px; font-size: 11px; }"
+            "QPushButton:hover { background: #2563eb; color: white; border-color: #2563eb; }"
         )
         btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -361,7 +360,6 @@ class RecipeView(QWidget):
             self._meta_grid.addWidget(url_lbl, row, 2)
             row += 1
         self._meta_frame.setVisible(row > 0)
-        self._refetch_btn.setVisible(bool(recipe.url))
 
         # Description
         self._desc.setText(recipe.description)

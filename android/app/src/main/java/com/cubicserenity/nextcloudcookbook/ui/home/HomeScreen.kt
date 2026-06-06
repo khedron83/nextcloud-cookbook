@@ -117,7 +117,7 @@ fun RecipeCard(
     serverUrl: String,
     onClick: (Int) -> Unit,
 ) {
-    val imageUrl = serverUrl.takeIf { it.isNotBlank() }
+    val imageUrl = serverUrl.trimEnd('/').takeIf { it.isNotBlank() }
         ?.let { "$it/index.php/apps/cookbook/api/v1/recipes/${recipe.id}/image?size=thumb" }
 
     Card(onClick = { onClick(recipe.id) }, modifier = Modifier.fillMaxWidth()) {

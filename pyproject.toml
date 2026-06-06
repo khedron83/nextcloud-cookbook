@@ -20,3 +20,6 @@ py-modules = ["main"]
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["app*"]
+
+[tool.setuptools.package-data]
+"app" = ["resources/*.svg"]

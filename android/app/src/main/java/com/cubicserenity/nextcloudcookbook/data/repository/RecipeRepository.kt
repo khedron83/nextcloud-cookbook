@@ -73,9 +73,6 @@ class RecipeRepository @Inject constructor(
 
     suspend fun deleteRecipe(id: Int) = api().deleteRecipe(id)
 
-    suspend fun importFromUrl(url: String): Recipe =
-        api().importRecipe(url).toDomain()
-
     suspend fun getCategories(): List<String> =
         api().getCategories().mapNotNull { it.name }.filter { it.isNotBlank() }
 

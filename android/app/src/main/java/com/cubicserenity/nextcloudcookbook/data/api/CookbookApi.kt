@@ -25,10 +25,6 @@ interface CookbookApi {
     @DELETE("api/v1/recipes/{id}")
     suspend fun deleteRecipe(@Path("id") id: Int): Response<ResponseBody>
 
-    @FormUrlEncoded
-    @POST("api/v1/import")
-    suspend fun importRecipe(@Field("url") url: String): RecipeDto
-
     @GET("api/v1/search/{query}")
     suspend fun searchRecipes(@Path("query") query: String): List<RecipeSummaryDto>
 

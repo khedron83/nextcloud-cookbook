@@ -33,8 +33,7 @@ fun NavGraph() {
         composable("main") {
             MainShell(
                 onRecipeClick = { rootNav.navigate("detail/$it") },
-                onNewRecipe = { rootNav.navigate("edit?id=-1&import=false") },
-                onImportUrl = { rootNav.navigate("edit?id=-1&import=true") },
+                onNewRecipe = { rootNav.navigate("edit?id=-1") },
                 onOpenSettings = { rootNav.navigate("settings") },
             )
         }
@@ -46,21 +45,18 @@ fun NavGraph() {
             RecipeDetailScreen(
                 recipeId = id,
                 onBack = { rootNav.popBackStack() },
-                onEdit = { rootNav.navigate("edit?id=$id&import=false") },
+                onEdit = { rootNav.navigate("edit?id=$id") },
             )
         }
         composable(
-            "edit?id={id}&import={import}",
+            "edit?id={id}",
             arguments = listOf(
                 navArgument("id") { type = NavType.IntType; defaultValue = -1 },
-                navArgument("import") { type = NavType.BoolType; defaultValue = false },
             ),
         ) { back ->
             val id = back.arguments!!.getInt("id").takeIf { it != -1 }
-            val openImport = back.arguments!!.getBoolean("import")
             RecipeEditScreen(
                 recipeId = id,
-                openImportDialog = openImport,
                 onSaved = { savedId ->
                     rootNav.popBackStack()
                     rootNav.navigate("detail/$savedId")
@@ -78,7 +74,6 @@ fun NavGraph() {
 private fun MainShell(
     onRecipeClick: (Int) -> Unit,
     onNewRecipe: () -> Unit,
-    onImportUrl: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     var selectedTab by rememberSaveable { mutableStateOf(Tab.RECIPES) }
@@ -102,7 +97,6 @@ private fun MainShell(
                 modifier = Modifier.padding(padding),
                 onRecipeClick = onRecipeClick,
                 onNewRecipe = onNewRecipe,
-                onImportUrl = onImportUrl,
                 onOpenSettings = onOpenSettings,
             )
             Tab.CATEGORIES -> CategoriesScreen(

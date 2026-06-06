@@ -78,40 +78,6 @@ class RecipeDetailViewModel @Inject constructor(
         }
     }
 
-    fun refetchRecipe() {
-        val recipe = _state.value.recipe ?: return
-        val url = recipe.url.takeIf { it.isNotBlank() } ?: return
-        val existingId = recipe.id ?: return
-        viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
-            try {
-                val fetched = repository.importFromUrl(url)
-                val tempId = fetched.id ?: return@launch
-
-                val updated = recipe.copy(
-                    name = fetched.name,
-                    description = fetched.description,
-                    recipeYield = fetched.recipeYield,
-                    prepTime = fetched.prepTime,
-                    cookTime = fetched.cookTime,
-                    totalTime = fetched.totalTime,
-                    recipeIngredient = fetched.recipeIngredient,
-                    recipeInstructions = fetched.recipeInstructions,
-                    tools = fetched.tools,
-                    nutrition = fetched.nutrition,
-                    keywords = fetched.keywords,
-                )
-
-                repository.deleteRecipe(tempId)
-                repository.updateRecipe(updated)
-                val refreshed = repository.getRecipe(existingId)
-                _state.update { it.copy(recipe = refreshed, isLoading = false) }
-            } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = "Failed to refetch: ${e.message}") }
-            }
-        }
-    }
-
     fun getDisplayIngredients(): List<String> {
         val s = _state.value
         val recipe = s.recipe ?: return emptyList()

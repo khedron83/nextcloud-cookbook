@@ -1,0 +1,4 @@
+-keepattributes Signature
+-keepattributes *Annotation*
+-keep class com.cubicserenity.nextcloudcookbook.data.api.** { *; }
+-keep class com.cubicserenity.nextcloudcookbook.domain.model.** { *; }

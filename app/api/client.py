@@ -83,7 +83,11 @@ class CookbookClient:
             pass
         from app.parsers import parse_recipe_from_url
         data = parse_recipe_from_url(url, verify_ssl=bool(self._session.verify))
-        return self.create_recipe(data)
+        recipe_id = self.create_recipe(data)
+        # create_recipe returns a bare integer ID; normalise for _on_imported
+        if isinstance(recipe_id, int):
+            return {"id": recipe_id}
+        return recipe_id
 
     def search_recipes(self, query: str) -> list[dict]:
         return self._get(f"/api/v1/search/{query}").json()

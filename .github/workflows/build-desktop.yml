@@ -113,52 +113,8 @@ jobs:
           path: nextcloud-cookbook.flatpak
           retention-days: 30
 
-  android:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '8.9'
-
-      - name: Generate Gradle wrapper
-        working-directory: android
-        run: gradle wrapper --gradle-version 8.9
-
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ hashFiles('android/**/*.gradle.kts', 'android/gradle/libs.versions.toml') }}
-          restore-keys: gradle-
-
-      - name: Build debug APK
-        working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
-
-      - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk nextcloud-cookbook-android.apk
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: nextcloud-cookbook-android
-          path: nextcloud-cookbook-android.apk
-          retention-days: 30
-
   release:
-    needs: [build, flatpak, android]
+    needs: [build, flatpak]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -177,5 +133,4 @@ jobs:
           files: |
             artifacts/**/*.zip
             artifacts/**/*.flatpak
-            artifacts/**/*.apk
           generate_release_notes: ${{ startsWith(github.ref, 'refs/tags/') }}

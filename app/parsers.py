@@ -239,7 +239,13 @@ def _parse_james_martin(html: str, url: str) -> dict | None:
     instructions = []
     content = desktop.select_one("div.recipe-description div.content")
     if content:
-        for p in content.select("p"):
+        paras = content.select("p")
+        if not paras:
+            # JS-rendered pages may put the HTML only in the data attribute
+            raw_html = content.get("data-rbds_content_content", "")
+            if raw_html:
+                paras = BeautifulSoup(raw_html, "html.parser").select("p")
+        for p in paras:
             text = p.get_text(" ", strip=True)
             if text:
                 instructions.append({"@type": "HowToStep", "text": text})

@@ -193,73 +193,56 @@ def _parse_james_martin(html: str, url: str) -> dict | None:
     soup = BeautifulSoup(html, "html.parser")
 
     # ── Title ─────────────────────────────────────────────────────────────────
-    name = ""
-    for sel in (".recipe-title", "h1.entry-title", ".entry-title", "h1"):
-        el = soup.select_one(sel)
-        if el:
-            name = el.get_text(strip=True)
-            break
-    if not name:
+    el = soup.select_one("h4.recipe-introduction-title")
+    if not el:
         return None
+    name = el.get_text(strip=True)
 
-    # ── Ingredients ───────────────────────────────────────────────────────────
-    ingredients = []
-    ingredient_selectors = [
-        ".ingredients li",
-        ".recipe-ingredients li",
-        "[class*='ingredient'] li",
-        ".recipe__ingredients li",
-        ".wprm-recipe-ingredient",
-    ]
-    for sel in ingredient_selectors:
-        items = soup.select(sel)
-        if items:
-            ingredients = [li.get_text(" ", strip=True) for li in items if li.get_text(strip=True)]
-            break
-
-    # ── Method ────────────────────────────────────────────────────────────────
-    instructions = []
-    method_selectors = [
-        ".method li",
-        ".recipe-method li",
-        ".recipe-steps li",
-        "[class*='method'] li",
-        ".recipe__method li",
-        ".wprm-recipe-instruction-text",
-        ".instructions li",
-    ]
-    for sel in method_selectors:
-        items = soup.select(sel)
-        if items:
-            instructions = [
-                {"@type": "HowToStep", "text": li.get_text(" ", strip=True)}
-                for li in items if li.get_text(strip=True)
-            ]
-            break
+    # ── Image — stored in data-image on the photo wrapper ────────────────────
+    img = ""
+    photo = soup.select_one("div.recipe-introduction-photo[data-image]")
+    if photo:
+        img = photo.get("data-image", "")
 
     # ── Description ───────────────────────────────────────────────────────────
     description = ""
-    for sel in (".recipe-description", ".recipe-intro", ".entry-summary"):
-        el = soup.select_one(sel)
-        if el:
-            description = el.get_text(" ", strip=True)
-            break
+    el = soup.select_one("div.recipe-introduction-description")
+    if el:
+        description = el.get_text(" ", strip=True)
 
-    # ── Image ─────────────────────────────────────────────────────────────────
-    img = ""
-    for sel in (".recipe-hero img", ".recipe-image img", ".wp-post-image", ".entry-image img"):
-        el = soup.select_one(sel)
-        if el:
-            img = el.get("src", "")
-            break
+    # ── Category ──────────────────────────────────────────────────────────────
+    category = ""
+    el = soup.select_one("div.recipe-introduction-categories a")
+    if el:
+        category = el.get_text(strip=True)
 
-    # ── Yield / Serves ────────────────────────────────────────────────────────
+    # ── Serves ────────────────────────────────────────────────────────────────
     recipe_yield = ""
-    for sel in (".recipe-serves", ".recipe-yield", "[class*='serves']", "[class*='yield']"):
-        el = soup.select_one(sel)
-        if el:
-            recipe_yield = el.get_text(strip=True)
-            break
+    el = soup.select_one("div.serves span")
+    if el:
+        recipe_yield = el.get_text(strip=True)
+
+    # ── Ingredients — each .single-ingredient may have a title + a <ul> ──────
+    ingredients = []
+    for group in soup.select("div.single-ingredient"):
+        title_el = group.select_one("div.title")
+        group_title = title_el.get_text(strip=True) if title_el else ""
+        for li in group.select("div.content li"):
+            text = li.get_text(" ", strip=True)
+            if text:
+                if group_title:
+                    ingredients.append(f"{group_title}: {text}")
+                else:
+                    ingredients.append(text)
+
+    # ── Method — each <p> inside .recipe-description .content is a step ───────
+    instructions = []
+    content = soup.select_one("div.recipe-description div.content")
+    if content:
+        for p in content.select("p"):
+            text = p.get_text(" ", strip=True)
+            if text:
+                instructions.append({"@type": "HowToStep", "text": text})
 
     if not ingredients and not instructions:
         return None
@@ -275,7 +258,7 @@ def _parse_james_martin(html: str, url: str) -> dict | None:
         "prepTime": "",
         "cookTime": "",
         "totalTime": "",
-        "recipeCategory": "",
+        "recipeCategory": category,
         "keywords": "",
         "recipeIngredient": ingredients,
         "recipeInstructions": instructions,

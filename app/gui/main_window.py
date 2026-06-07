@@ -550,7 +550,7 @@ class MainWindow(QMainWindow):
                 return
             url = url.strip()
         self.statusBar().showMessage(f"Importing from {url}…")
-        self._run(self._client.import_recipe, self._on_imported, url)
+        self._run(self._client.import_recipe_with_fallback, self._on_imported, url)
 
     def _on_imported(self, data: dict):
         recipe_id = data.get("recipeId") or data.get("id")

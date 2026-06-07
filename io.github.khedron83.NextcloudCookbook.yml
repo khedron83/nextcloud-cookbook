@@ -21,7 +21,7 @@ modules:
   # Regenerate with:
   #   .venv/bin/python -m flatpak_pip_generator \
   #     --runtime org.kde.Sdk//6.9 \
-  #     requests \
+  #     requests beautifulsoup4 \
   #     -o python3-deps.json
   - python3-deps.json
 

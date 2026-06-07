@@ -75,6 +75,16 @@ class CookbookClient:
     def import_recipe(self, url: str) -> dict:
         return self._post("/api/v1/import", data={"url": url}).json()
 
+    def import_recipe_with_fallback(self, url: str) -> dict:
+        """Try Nextcloud API import; on failure parse locally and create the recipe."""
+        try:
+            return self.import_recipe(url)
+        except CookbookAPIError:
+            pass
+        from app.parsers import parse_recipe_from_url
+        data = parse_recipe_from_url(url, verify_ssl=bool(self._session.verify))
+        return self.create_recipe(data)
+
     def search_recipes(self, query: str) -> list[dict]:
         return self._get(f"/api/v1/search/{query}").json()
 

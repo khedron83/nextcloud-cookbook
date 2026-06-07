@@ -219,9 +219,12 @@ def _parse_james_martin(html: str, url: str) -> dict | None:
     if el:
         recipe_yield = el.get_text(strip=True)
 
+    # Scope to the desktop version to avoid picking up the duplicate mobile section
+    desktop = soup.select_one("div.recipe-content.desktop") or soup
+
     # ── Ingredients — each .single-ingredient may have a title + a <ul> ──────
     ingredients = []
-    for group in soup.select("div.single-ingredient"):
+    for group in desktop.select("div.single-ingredient"):
         title_el = group.select_one("div.title")
         group_title = title_el.get_text(strip=True) if title_el else ""
         for li in group.select("div.content li"):
@@ -234,7 +237,7 @@ def _parse_james_martin(html: str, url: str) -> dict | None:
 
     # ── Method — each <p> inside .recipe-description .content is a step ───────
     instructions = []
-    content = soup.select_one("div.recipe-description div.content")
+    content = desktop.select_one("div.recipe-description div.content")
     if content:
         for p in content.select("p"):
             text = p.get_text(" ", strip=True)

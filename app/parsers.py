@@ -185,10 +185,7 @@ def _normalise_json_ld(d: dict, source_url: str = "") -> dict:
 
 @_register("jamesmartinchef")
 def _parse_james_martin(html: str, url: str) -> dict | None:
-    try:
-        from bs4 import BeautifulSoup
-    except ImportError:
-        return None
+    from bs4 import BeautifulSoup
 
     soup = BeautifulSoup(html, "html.parser")
 

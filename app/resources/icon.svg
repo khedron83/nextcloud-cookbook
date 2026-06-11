@@ -1,14 +1,35 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
-  <rect width="128" height="128" rx="24" fill="#0082C9"/>
-  <!-- Fork (left) -->
-  <g fill="#FFFFFF">
-    <rect x="36" y="22" width="4" height="28" rx="2"/>
-    <rect x="44" y="22" width="4" height="28" rx="2"/>
-    <rect x="52" y="22" width="4" height="28" rx="2"/>
-    <path d="M36 46 Q36 58 44 60 L44 106 Q44 108 46 108 L50 108 Q52 108 52 106 L52 60 Q60 58 60 46 Z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e3050"/>
+      <stop offset="100%" stop-color="#0c1824"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+
+  <!-- Plate disc -->
+  <circle cx="256" cy="268" r="190" fill="#162438"/>
+  <circle cx="256" cy="268" r="190" fill="none" stroke="#3b82f6" stroke-width="6" opacity="0.28"/>
+
+  <!-- Fork -->
+  <g fill="#dce8f5">
+    <!-- Tines -->
+    <rect x="128" y="68" width="10" height="104" rx="5"/>
+    <rect x="150" y="68" width="10" height="104" rx="5"/>
+    <rect x="172" y="68" width="10" height="104" rx="5"/>
+    <!-- Neck + handle -->
+    <path d="M128,168 Q126,218 148,228 L148,442 Q148,448 157,448 Q166,448 164,442 L164,228 Q186,218 182,168 Z"/>
   </g>
-  <!-- Knife (right) -->
-  <g fill="#FFFFFF">
-    <path d="M72 22 L72 106 Q72 108 74 108 L78 108 Q80 108 80 106 L80 66 L88 56 Q92 50 92 42 L92 22 Q92 20 84 20 Q72 18 72 22 Z"/>
+
+  <!-- Knife -->
+  <g fill="#dce8f5">
+    <!-- Blade: spine left, curved cutting edge right -->
+    <path d="M286,68 L366,68 C392,110 390,200 370,244 L286,244 Z"/>
+    <!-- Bolster -->
+    <rect x="286" y="244" width="92" height="18" rx="5"/>
+    <!-- Handle -->
+    <rect x="298" y="262" width="68" height="192" rx="16"/>
   </g>
 </svg>

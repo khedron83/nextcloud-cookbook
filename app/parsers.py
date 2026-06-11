@@ -235,18 +235,19 @@ def _parse_james_martin(html: str, url: str) -> dict | None:
                 else:
                     ingredients.append(text)
 
-    # ── Method — each <p> inside .recipe-description .content is a step ───────
+    # ── Method — steps are in <p> or <li> inside .recipe-description .content ──
     instructions = []
     content = desktop.select_one("div.recipe-description div.content")
     if content:
-        paras = content.select("p")
-        if not paras:
+        steps = content.select("p") or content.select("li")
+        if not steps:
             # JS-rendered pages may put the HTML only in the data attribute
             raw_html = content.get("data-rbds_content_content", "")
             if raw_html:
-                paras = BeautifulSoup(raw_html, "html.parser").select("p")
-        for p in paras:
-            text = p.get_text(" ", strip=True)
+                inner = BeautifulSoup(raw_html, "html.parser")
+                steps = inner.select("p") or inner.select("li")
+        for step in steps:
+            text = step.get_text(" ", strip=True)
             if text:
                 instructions.append({"@type": "HowToStep", "text": text})
 

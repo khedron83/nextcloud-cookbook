@@ -6,12 +6,16 @@ from PySide6.QtWidgets import (
     QListWidget, QListWidgetItem, QDialogButtonBox, QTextEdit,
     QSizePolicy,
 )
-from PySide6.QtCore import Signal, Qt, QSettings
-from PySide6.QtGui import QFont
+from PySide6.QtCore import Signal, Qt, QSettings, QMimeData, QByteArray, QPoint
+from PySide6.QtGui import QFont, QDrag, QPixmap
 
 from app.models import RecipeSummary
+from app.workers import Worker
 
-_MEALS = ["Breakfast", "Lunch", "Dinner"]
+_MEALS   = ["Breakfast", "Lunch", "Dinner"]
+_MIME    = "application/x-mealcell"
+_THUMB_W = 150
+_THUMB_H = 84   # ~16:9
 
 
 def _week_monday(d: date) -> date:
@@ -23,7 +27,6 @@ def _slot_key(d: date, meal: str) -> str:
 
 
 def _load_slot(d: date, meal: str) -> tuple[int, str] | None:
-    """Returns (recipe_id, name) or None."""
     raw = QSettings().value(_slot_key(d, meal))
     if raw:
         try:
@@ -43,7 +46,6 @@ def _clear_slot(d: date, meal: str):
 
 
 def _all_local_entries() -> list[dict]:
-    """Read all meal plan entries from QSettings."""
     settings = QSettings()
     settings.beginGroup("mealplan")
     entries = []
@@ -68,12 +70,10 @@ def _all_local_entries() -> list[dict]:
 
 
 def _apply_remote_entries(entries: list[dict]):
-    """Write remote entries into QSettings (merge — remote wins)."""
     for e in entries:
         try:
             d = date.fromisoformat(e["date"])
-            meal = e["meal"]
-            _save_slot(d, meal, e["recipeId"], e["recipeName"])
+            _save_slot(d, e["meal"], e["recipeId"], e["recipeName"])
         except Exception:
             pass
 
@@ -129,30 +129,47 @@ class RecipePicker(QDialog):
 # ── Single meal cell ──────────────────────────────────────────────────────────
 
 class MealCell(QFrame):
-    assign_requested = Signal(date, str)   # date, meal
+    assign_requested = Signal(date, str)
     cleared          = Signal(date, str)
+    swap_requested   = Signal(date, str, date, str)   # src_day, src_meal, dst_day, dst_meal
+
+    _STYLE_NORMAL = (
+        "MealCell { border: 1px solid palette(mid); border-radius: 5px;"
+        " background: palette(base); }"
+    )
+    _STYLE_HOVER = (
+        "MealCell { border: 2px solid #2563eb; border-radius: 5px;"
+        " background: #1d3461; }"
+    )
 
     def __init__(self, day: date, meal: str, parent=None):
         super().__init__(parent)
-        self._day  = day
-        self._meal = meal
+        self._day        = day
+        self._meal       = meal
+        self._drag_start: QPoint | None = None
         self.setFrameShape(QFrame.Shape.StyledPanel)
-        self.setStyleSheet(
-            "MealCell { border: 1px solid palette(mid); border-radius: 5px;"
-            " background: palette(base); }"
-        )
-        self.setMinimumHeight(70)
+        self.setStyleSheet(self._STYLE_NORMAL)
+        self.setAcceptDrops(True)
         self._build()
         self.refresh()
 
     def _build(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(6, 4, 6, 4)
-        layout.setSpacing(2)
+        layout.setSpacing(3)
 
         meal_lbl = QLabel(self._meal)
-        meal_lbl.setStyleSheet("font-size: 10px; color: palette(placeholderText); font-weight: bold;")
+        meal_lbl.setStyleSheet(
+            "font-size: 10px; color: palette(placeholderText); font-weight: bold;"
+        )
         layout.addWidget(meal_lbl)
+
+        self._img = QLabel()
+        self._img.setFixedSize(_THUMB_W, _THUMB_H)
+        self._img.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._img.setStyleSheet("background: #1e2a3a; border-radius: 4px;")
+        self._img.setVisible(False)
+        layout.addWidget(self._img, alignment=Qt.AlignmentFlag.AlignHCenter)
 
         self._name_lbl = QLabel()
         self._name_lbl.setWordWrap(True)
@@ -195,15 +212,95 @@ class MealCell(QFrame):
             self._name_lbl.setVisible(False)
             self._add_btn.setText("+ Add")
             self._rm_btn.setVisible(False)
+            self._img.setPixmap(QPixmap())
+            self._img.setVisible(False)
+
+    def set_thumbnail(self, px: QPixmap):
+        scaled = px.scaled(
+            _THUMB_W, _THUMB_H,
+            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        if scaled.width() > _THUMB_W:
+            x = (scaled.width() - _THUMB_W) // 2
+            scaled = scaled.copy(x, 0, _THUMB_W, _THUMB_H)
+        if scaled.height() > _THUMB_H:
+            y = (scaled.height() - _THUMB_H) // 2
+            scaled = scaled.copy(0, y, _THUMB_W, _THUMB_H)
+        self._img.setPixmap(scaled)
+        self._img.setVisible(True)
+
+    def assigned_id(self) -> int | None:
+        slot = _load_slot(self._day, self._meal)
+        return slot[0] if slot else None
 
     def _remove(self):
         _clear_slot(self._day, self._meal)
         self.refresh()
         self.cleared.emit(self._day, self._meal)
 
-    def assigned_id(self) -> int | None:
+    # ── Drag ─────────────────────────────────────────────────────────────────
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and _load_slot(self._day, self._meal):
+            self._drag_start = event.position().toPoint()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if (self._drag_start is not None
+                and event.buttons() & Qt.MouseButton.LeftButton
+                and (event.position().toPoint() - self._drag_start).manhattanLength() > 8):
+            self._drag_start = None
+            self._start_drag()
+        super().mouseMoveEvent(event)
+
+    def _start_drag(self):
         slot = _load_slot(self._day, self._meal)
-        return slot[0] if slot else None
+        if not slot:
+            return
+        rid, name = slot
+        payload = json.dumps({
+            "date": self._day.isoformat(),
+            "meal": self._meal,
+            "id": rid,
+            "name": name,
+        })
+        mime = QMimeData()
+        mime.setData(_MIME, QByteArray(payload.encode()))
+        drag = QDrag(self)
+        drag.setMimeData(mime)
+        if self._img.isVisible() and not self._img.pixmap().isNull():
+            drag.setPixmap(self._img.pixmap())
+        drag.exec(Qt.DropAction.MoveAction)
+
+    # ── Drop ─────────────────────────────────────────────────────────────────
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasFormat(_MIME):
+            event.acceptProposedAction()
+            self.setStyleSheet(self._STYLE_HOVER)
+
+    def dragLeaveEvent(self, event):
+        self.setStyleSheet(self._STYLE_NORMAL)
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasFormat(_MIME):
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        self.setStyleSheet(self._STYLE_NORMAL)
+        if not event.mimeData().hasFormat(_MIME):
+            return
+        try:
+            payload = json.loads(bytes(event.mimeData().data(_MIME)).decode())
+            src_day  = date.fromisoformat(payload["date"])
+            src_meal = payload["meal"]
+        except Exception:
+            return
+        if src_day == self._day and src_meal == self._meal:
+            return
+        self.swap_requested.emit(src_day, src_meal, self._day, self._meal)
+        event.acceptProposedAction()
 
 
 # ── Shopping list dialog ──────────────────────────────────────────────────────
@@ -247,11 +344,13 @@ class ShoppingListDialog(QDialog):
 class MealPlannerView(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._week  = _week_monday(date.today())
+        self._week         = _week_monday(date.today())
         self._recipes: list[RecipeSummary] = []
-        self._index = None
+        self._index        = None
         self._cells: list[MealCell] = []
-        self._client = None
+        self._client       = None
+        self._thumb_cache: dict[int, QPixmap] = {}
+        self._workers: list[Worker] = []
         self._build_ui()
 
     def set_client(self, client):
@@ -290,7 +389,6 @@ class MealPlannerView(QWidget):
         outer.setContentsMargins(12, 12, 12, 12)
         outer.setSpacing(10)
 
-        # Nav bar
         nav = QHBoxLayout()
         prev_btn = QPushButton("← Prev")
         prev_btn.clicked.connect(self._prev_week)
@@ -315,7 +413,6 @@ class MealPlannerView(QWidget):
         sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
         outer.addWidget(sep)
 
-        # Scrollable grid
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -329,38 +426,37 @@ class MealPlannerView(QWidget):
         self._rebuild_grid()
 
     def _rebuild_grid(self):
-        # Clear
         while self._grid.count():
             item = self._grid.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
         self._cells.clear()
 
-        today = date.today()
-        days = [self._week + timedelta(days=i) for i in range(7)]
-        day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        today    = date.today()
+        days     = [self._week + timedelta(days=i) for i in range(7)]
+        day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-        # Header row
         for col, (name, day) in enumerate(zip(day_names, days)):
             lbl = QLabel(f"{name}\n{day.strftime('%-d %b')}")
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             lbl.setStyleSheet(
                 "font-weight: bold; font-size: 12px; padding: 4px;"
-                + (" background: palette(highlight); color: palette(highlightedText); border-radius: 4px;"
-                   if day == today else "")
+                + (" background: palette(highlight); color: palette(highlightedText);"
+                   " border-radius: 4px;" if day == today else "")
             )
             self._grid.addWidget(lbl, 0, col)
 
-        # Meal rows
         for row, meal in enumerate(_MEALS, 1):
             for col, day in enumerate(days):
                 cell = MealCell(day, meal)
                 cell.assign_requested.connect(self._on_assign)
-                cell.cleared.connect(lambda _d, _m: self._push_to_server())
+                cell.cleared.connect(self._on_cleared)
+                cell.swap_requested.connect(self._on_swap)
                 self._cells.append(cell)
                 self._grid.addWidget(cell, row, col)
 
         self._update_week_label()
+        self._fetch_week_thumbnails()
 
     def _update_week_label(self):
         end = self._week + timedelta(days=6)
@@ -396,14 +492,87 @@ class MealPlannerView(QWidget):
             for cell in self._cells:
                 if cell._day == day and cell._meal == meal:
                     cell.refresh()
+                    rid = int(r.recipe_id)
+                    if rid in self._thumb_cache:
+                        cell.set_thumbnail(self._thumb_cache[rid])
+                    elif rid > 0:
+                        self._fetch_one_thumb(rid)
                     break
             self._push_to_server()
+
+    def _on_cleared(self, day: date, meal: str):
+        self._push_to_server()
+
+    def _on_swap(self, src_day: date, src_meal: str, dst_day: date, dst_meal: str):
+        src = _load_slot(src_day, src_meal)
+        dst = _load_slot(dst_day, dst_meal)
+
+        if src:
+            _save_slot(dst_day, dst_meal, src[0], src[1])
+        else:
+            _clear_slot(dst_day, dst_meal)
+        if dst:
+            _save_slot(src_day, src_meal, dst[0], dst[1])
+        else:
+            _clear_slot(src_day, src_meal)
+
+        for cell in self._cells:
+            if (cell._day == src_day and cell._meal == src_meal) or \
+               (cell._day == dst_day and cell._meal == dst_meal):
+                cell.refresh()
+
+        self._apply_cached_thumbnails()
+        self._push_to_server()
+
+    # ── Thumbnails ────────────────────────────────────────────────────────────
+
+    def _fetch_week_thumbnails(self):
+        if not self._client:
+            return
+        seen: set[int] = set()
+        for cell in self._cells:
+            slot = _load_slot(cell._day, cell._meal)
+            if slot:
+                rid = int(slot[0])
+                if rid > 0:
+                    if rid in self._thumb_cache:
+                        cell.set_thumbnail(self._thumb_cache[rid])
+                    elif rid not in seen:
+                        seen.add(rid)
+                        self._fetch_one_thumb(rid)
+
+    def _fetch_one_thumb(self, recipe_id: int):
+        client = self._client
+        w = Worker(client.get_recipe_image, recipe_id, "thumb")
+        w.result.connect(lambda data, rid=recipe_id: self._on_thumb(rid, data))
+        self._workers.append(w)
+        w.finished.connect(lambda: self._workers.remove(w) if w in self._workers else None)
+        w.start()
+
+    def _on_thumb(self, recipe_id: int, data: bytes):
+        px = QPixmap()
+        px.loadFromData(data)
+        if px.isNull():
+            return
+        self._thumb_cache[recipe_id] = px
+        for cell in self._cells:
+            slot = _load_slot(cell._day, cell._meal)
+            if slot and int(slot[0]) == recipe_id:
+                cell.set_thumbnail(px)
+
+    def _apply_cached_thumbnails(self):
+        for cell in self._cells:
+            slot = _load_slot(cell._day, cell._meal)
+            if slot:
+                rid = int(slot[0])
+                if rid in self._thumb_cache:
+                    cell.set_thumbnail(self._thumb_cache[rid])
 
     # ── Shopping list ─────────────────────────────────────────────────────────
 
     def _show_shopping(self):
         days = [self._week + timedelta(days=i) for i in range(7)]
-        assigned_ids = set()
+        assigned_ids: set[int] = set()
         for day in days:
             for meal in _MEALS:
                 slot = _load_slot(day, meal)

@@ -3,8 +3,9 @@ from PySide6.QtWidgets import (
     QMessageBox, QStackedWidget,
     QStatusBar, QInputDialog, QLabel, QFrame, QPushButton,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QPixmap, QKeySequence
+from datetime import datetime
 import json
 from pathlib import Path
 
@@ -155,6 +156,11 @@ class MainWindow(QMainWindow):
         self._offline: bool = False
         self._stay_on_view: bool = False
         self._category_names: list[str] = []
+        self._pending: list[dict] = []
+        self._syncing: bool = False
+        self._last_sync: str = ""
+        self._sync_timer = QTimer(self)
+        self._sync_timer.timeout.connect(self._sync_pending)
         self._build_ui()
         self._init()
 
@@ -206,6 +212,13 @@ class MainWindow(QMainWindow):
         reindex_act = QAction("Re&index", self)
         reindex_act.triggered.connect(self._reindex)
         lib_menu.addAction(reindex_act)
+
+        lib_menu.addSeparator()
+
+        sync_now_act = QAction("Sync &Now", self)
+        sync_now_act.setShortcut("Ctrl+Shift+S")
+        sync_now_act.triggered.connect(self._sync_pending)
+        lib_menu.addAction(sync_now_act)
 
         lib_menu.addSeparator()
 
@@ -271,16 +284,24 @@ class MainWindow(QMainWindow):
         splitter.setSizes([220, 1060])
 
         self.setStatusBar(QStatusBar())
+        self._sync_label = QLabel()
+        self._sync_label.setStyleSheet("padding: 0 10px; font-size: 12px;")
+        self.statusBar().addPermanentWidget(self._sync_label)
 
     # ── Bootstrap ─────────────────────────────────────────────────────────────
 
     def _init(self):
+        self._load_pending()
+        self._update_sync_label()
         self._client = SettingsDialog.get_client()
         if not self._client:
             self.statusBar().showMessage("Configure your Nextcloud server in Settings.")
             self._open_settings()
         else:
             self._load()
+            self._restart_sync_timer()
+            if self._pending:
+                self._sync_pending()
 
     # ── Data loading ──────────────────────────────────────────────────────────
 
@@ -326,11 +347,29 @@ class MainWindow(QMainWindow):
             )
             for item in data
         ]
+        # Re-add locally created but not yet synced recipes
+        for entry in self._pending:
+            if entry["op"] == "create":
+                d = entry["data"]
+                self._all_recipes.append(RecipeSummary(
+                    recipe_id=entry["local_id"],
+                    name=d.get("name", ""),
+                    keywords=d.get("keywords", ""),
+                    category=d.get("recipeCategory", ""),
+                ))
         self._sidebar.set_total(len(self._all_recipes))
         self._on_category(self._active_category)
         self._planner.set_recipes(self._all_recipes)
         self.statusBar().showMessage(f"Loaded {len(self._all_recipes)} recipes.")
         self._start_ingredient_index()
+        all_tags: set[str] = set()
+        for r in self._all_recipes:
+            if r.keywords:
+                for tag in r.keywords.split(","):
+                    t = tag.strip()
+                    if t:
+                        all_tags.add(t)
+        self._editor.set_keyword_suggestions(list(all_tags))
 
     def _start_ingredient_index(self):
         if self._ing_index and self._ing_index.isRunning():
@@ -410,6 +449,7 @@ class MainWindow(QMainWindow):
         self._start_thumbnail_loader([r.recipe_id for r in recipes])
 
     def _start_thumbnail_loader(self, ids: list[int]):
+        ids = [i for i in ids if i > 0]
         if self._thumb_loader and self._thumb_loader.isRunning():
             self._thumb_loader.stop()
             self._thumb_loader.wait()
@@ -427,7 +467,7 @@ class MainWindow(QMainWindow):
     def _on_recipe_selected(self, recipe_id: int):
         if not self._client:
             return
-        if self._offline:
+        if recipe_id < 0 or self._offline:
             cached = self._load_cache()
             detail = cached.get('details', {}).get(str(recipe_id)) if cached else None
             if detail:
@@ -444,7 +484,7 @@ class MainWindow(QMainWindow):
         self._view.set_recipe(self._current)
         self._stack.setCurrentIndex(_VIEW)
         self.statusBar().showMessage(self._current.name)
-        if self._current.id and not self._offline:
+        if self._current.id is not None and int(self._current.id) > 0 and not self._offline:
             self._run_silent(
                 self._client.get_recipe_image,
                 self._view.set_image,
@@ -506,17 +546,92 @@ class MainWindow(QMainWindow):
             return
         rid = self._current.id
         self._current = None
-        self._run(self._client.delete_recipe, lambda _: self._load(), rid)
+        self._all_recipes = [r for r in self._all_recipes if int(r.recipe_id) != int(rid)]
+        if rid is not None and int(rid) < 0:
+            # Local-only: cancel the pending create, nothing to sync
+            self._pending = [e for e in self._pending
+                             if not (e["op"] == "create" and e["local_id"] == int(rid))]
+            self._save_pending()
+        else:
+            self._queue_op({"op": "delete", "recipe_id": int(rid)})
+        self._on_category(self._active_category)
         self._stack.setCurrentIndex(_GRID)
+        self._update_sync_label()
 
     def _save_recipe(self, recipe: Recipe):
         if not self._client:
             return
-        self.statusBar().showMessage("Saving…")
-        if recipe.id is None:
-            self._run(self._client.create_recipe, self._on_saved, recipe.to_api())
+        name_lower = recipe.name.strip().lower()
+        current_id = int(recipe.id) if recipe.id is not None else None
+        for r in self._all_recipes:
+            if current_id is not None and int(r.recipe_id) == current_id:
+                continue
+            if r.name.strip().lower() == name_lower:
+                reply = QMessageBox.question(
+                    self, "Duplicate Recipe",
+                    f'A recipe named "{r.name}" already exists. Save anyway?',
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                )
+                if reply != QMessageBox.StandardButton.Yes:
+                    return
+                break
+
+        data = recipe.to_api()
+
+        if recipe.id is None or (recipe.id is not None and int(recipe.id) < 0):
+            # New recipe or edit of an unsynced local recipe
+            local_id = int(recipe.id) if recipe.id is not None else self._next_local_id()
+            data["id"] = local_id
+            self._save_recipe_detail(data)
+            if recipe.id is None:
+                self._all_recipes.append(RecipeSummary(
+                    recipe_id=local_id,
+                    name=recipe.name,
+                    keywords=recipe.keywords,
+                    category=recipe.recipe_category,
+                ))
+            else:
+                for r in self._all_recipes:
+                    if int(r.recipe_id) == local_id:
+                        r.name = recipe.name
+                        r.keywords = recipe.keywords
+                        break
+            self._queue_op({"op": "create", "local_id": local_id, "data": data})
         else:
-            self._run(self._client.update_recipe, self._on_saved, recipe.id, recipe.to_api())
+            # Edit of a synced recipe
+            self._save_recipe_detail(data)
+            for r in self._all_recipes:
+                if int(r.recipe_id) == int(recipe.id):
+                    r.name = recipe.name
+                    r.keywords = recipe.keywords
+                    break
+            self._queue_op({"op": "update", "recipe_id": int(recipe.id), "data": data})
+
+        self._current = Recipe.from_api(data)
+        self._view.set_recipe(self._current)
+        self._stack.setCurrentIndex(_VIEW)
+        if self._current.id is not None and int(self._current.id) > 0 and not self._offline:
+            self._run_silent(
+                self._client.get_recipe_image,
+                self._view.set_image,
+                self._current.id,
+            )
+
+        if recipe.id is None:
+            # Brand-new recipe: add a card only if the grid is showing all recipes
+            if self._active_category is None:
+                self._grid.insert_recipe(RecipeSummary(
+                    recipe_id=local_id,
+                    name=recipe.name,
+                    keywords=recipe.keywords,
+                    category=recipe.recipe_category,
+                ))
+        else:
+            # Edit: update the existing card in-place (thumbnail untouched)
+            self._grid.refresh_recipe(int(recipe.id), recipe.name, recipe.keywords)
+
+        self._update_sync_label()
+        self.statusBar().showMessage(f"Saved locally: {recipe.name}")
 
     def _on_saved(self, data):
         # create returns a dict; update returns the recipe ID as an int
@@ -599,6 +714,7 @@ class MainWindow(QMainWindow):
         dlg = SettingsDialog(self)
         if dlg.exec():
             self._client = SettingsDialog.get_client()
+            self._restart_sync_timer()
             self._load()
 
     # ── Category rename ───────────────────────────────────────────────────────
@@ -642,6 +758,7 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Offline — showing cached data.")
         else:
             self._offline_banner.setVisible(False)
+        self._update_sync_label()
 
     def _save_cache(self, recipes: list, categories: list):
         try:
@@ -670,6 +787,179 @@ class MainWindow(QMainWindow):
             return json.loads(_CACHE_PATH.read_text(encoding='utf-8'))
         except Exception:
             return None
+
+    # ── Local-first sync ─────────────────────────────────────────────────────
+
+    def _next_local_id(self) -> int:
+        local_ids = [e["local_id"] for e in self._pending if e["op"] == "create"]
+        return min(local_ids + [0]) - 1
+
+    def _queue_op(self, entry: dict):
+        self._pending.append(entry)
+        self._save_pending()
+
+    def _squash_queue(self, ops: list[dict]) -> list[dict]:
+        state: dict[str, dict] = {}
+        for entry in ops:
+            op = entry["op"]
+            if op == "create":
+                key = f"local:{entry['local_id']}"
+                state[key] = entry
+            elif op == "update":
+                key = f"recipe:{entry['recipe_id']}"
+                state[key] = entry
+            elif op == "delete":
+                rid = entry["recipe_id"]
+                update_key = f"recipe:{rid}"
+                if update_key in state:
+                    del state[update_key]
+                state[f"recipe:{rid}"] = entry
+        return list(state.values())
+
+    def _sync_pending(self):
+        if not self._pending or not self._client or self._syncing or self._offline:
+            return
+        self._syncing = True
+        self.statusBar().showMessage("Syncing…")
+        ops = self._squash_queue(list(self._pending))
+        client = self._client
+
+        def _do_sync():
+            synced, failed, id_map = [], [], {}
+            for entry in ops:
+                try:
+                    op = entry["op"]
+                    if op == "create":
+                        result = client.create_recipe(entry["data"])
+                        real_id = result if isinstance(result, int) else int(result.get("id") or result.get("recipeId"))
+                        id_map[entry["local_id"]] = real_id
+                        synced.append(entry)
+                    elif op == "update":
+                        client.update_recipe(entry["recipe_id"], entry["data"])
+                        synced.append(entry)
+                    elif op == "delete":
+                        client.delete_recipe(entry["recipe_id"])
+                        synced.append(entry)
+                except Exception as e:
+                    failed.append((entry, str(e)))
+            return synced, failed, id_map
+
+        def _on_done(result):
+            self._syncing = False
+            synced, failed, id_map = result
+
+            # Replace temp local IDs with real server IDs
+            for local_id, real_id in id_map.items():
+                for r in self._all_recipes:
+                    if int(r.recipe_id) == local_id:
+                        r.recipe_id = real_id
+                        break
+                cached = self._load_cache() or {}
+                details = cached.get("details", {})
+                if str(local_id) in details:
+                    d = details.pop(str(local_id))
+                    d["id"] = real_id
+                    details[str(real_id)] = d
+                    cached["details"] = details
+                    try:
+                        _CACHE_PATH.write_text(json.dumps(cached), encoding="utf-8")
+                    except Exception:
+                        pass
+                if self._current and self._current.id == local_id:
+                    self._current = Recipe.from_api({**self._current.to_api(), "id": real_id})
+                    if self._stack.currentIndex() == _VIEW:
+                        self._view.set_recipe(self._current)
+
+            # Remove synced ops from the queue
+            synced_keys = set()
+            for entry in synced:
+                if entry["op"] == "create":
+                    synced_keys.add(f"local:{entry['local_id']}")
+                else:
+                    synced_keys.add(f"recipe:{entry['recipe_id']}")
+            self._pending = [
+                e for e in self._pending
+                if (f"local:{e['local_id']}" if e["op"] == "create" else f"recipe:{e['recipe_id']}") not in synced_keys
+            ]
+
+            self._last_sync = datetime.now().strftime("%H:%M")
+            self._save_pending()
+            self._update_sync_label()
+            for local_id, real_id in id_map.items():
+                self._grid.remap_recipe_id(local_id, real_id)
+
+            if failed:
+                errors = "; ".join(msg for _, msg in failed[:2])
+                self.statusBar().showMessage(f"Sync: {len(synced)} ok — {errors}")
+            else:
+                self.statusBar().showMessage(f"Synced {len(synced)} change(s) at {self._last_sync}.")
+
+        self._run(_do_sync, _on_done)
+
+    def _restart_sync_timer(self):
+        from PySide6.QtCore import QSettings
+        interval = QSettings().value("sync/interval_minutes", 5, type=int)
+        if interval > 0:
+            self._sync_timer.start(interval * 60 * 1000)
+        else:
+            self._sync_timer.stop()
+
+    def _update_sync_label(self):
+        n = len(self._pending)
+        if self._offline:
+            suffix = f" · {self._last_sync}" if self._last_sync else ""
+            self._sync_label.setText(f"Offline{suffix}")
+            self._sync_label.setStyleSheet("color: #94a3b8; padding: 0 10px; font-size: 12px;")
+        elif n:
+            self._sync_label.setText(f"● {n} pending")
+            self._sync_label.setStyleSheet("color: #f59e0b; padding: 0 10px; font-size: 12px;")
+        elif self._last_sync:
+            self._sync_label.setText(f"✓ {self._last_sync}")
+            self._sync_label.setStyleSheet("color: #4ade80; padding: 0 10px; font-size: 12px;")
+        else:
+            self._sync_label.setText("")
+
+    def _save_pending(self):
+        try:
+            existing = self._load_cache() or {}
+            existing["pending"] = self._pending
+            existing["last_sync"] = self._last_sync
+            _CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            _CACHE_PATH.write_text(json.dumps(existing), encoding="utf-8")
+        except Exception:
+            pass
+
+    def _load_pending(self):
+        cached = self._load_cache() or {}
+        self._pending = cached.get("pending", [])
+        self._last_sync = cached.get("last_sync", "")
+
+    def closeEvent(self, event):
+        self._sync_timer.stop()
+        if self._pending and self._client and not self._offline:
+            self.statusBar().showMessage("Syncing before close…")
+            ops = self._squash_queue(list(self._pending))
+            succeeded_keys: set[str] = set()
+            for entry in ops:
+                try:
+                    op = entry["op"]
+                    if op == "create":
+                        self._client.create_recipe(entry["data"])
+                        succeeded_keys.add(f"local:{entry['local_id']}")
+                    elif op == "update":
+                        self._client.update_recipe(entry["recipe_id"], entry["data"])
+                        succeeded_keys.add(f"recipe:{entry['recipe_id']}")
+                    elif op == "delete":
+                        self._client.delete_recipe(entry["recipe_id"])
+                        succeeded_keys.add(f"recipe:{entry['recipe_id']}")
+                except Exception:
+                    pass
+            self._pending = [
+                e for e in self._pending
+                if (f"local:{e['local_id']}" if e["op"] == "create" else f"recipe:{e['recipe_id']}") not in succeeded_keys
+            ]
+            self._save_pending()
+        event.accept()
 
     # ── Worker helpers ────────────────────────────────────────────────────────
 

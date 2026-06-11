@@ -97,7 +97,8 @@ class ExportDialog(QDialog):
     def __init__(self, client: CookbookClient, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Export Recipes")
-        self.setMinimumWidth(500)
+        self.resize(540, 420)
+        self.setMinimumSize(400, 320)
         self._client = client
         self._worker: _ExportWorker | None = None
         self._build_ui()
@@ -115,7 +116,7 @@ class ExportDialog(QDialog):
 
         self._log = QTextEdit()
         self._log.setReadOnly(True)
-        self._log.setFixedHeight(180)
+        self._log.setMinimumHeight(160)
         self._log.setVisible(False)
         layout.addWidget(self._log)
 
@@ -175,7 +176,8 @@ class ImportDialog(QDialog):
     def __init__(self, client: CookbookClient, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Import Recipes")
-        self.setMinimumWidth(500)
+        self.resize(540, 420)
+        self.setMinimumSize(400, 320)
         self._client = client
         self._worker: _ImportWorker | None = None
         self._build_ui()
@@ -196,7 +198,7 @@ class ImportDialog(QDialog):
 
         self._log = QTextEdit()
         self._log.setReadOnly(True)
-        self._log.setFixedHeight(180)
+        self._log.setMinimumHeight(160)
         self._log.setVisible(False)
         layout.addWidget(self._log)
 

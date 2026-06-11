@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
     QDialog, QFormLayout, QLineEdit, QDialogButtonBox,
-    QLabel, QPushButton, QVBoxLayout, QMessageBox, QCheckBox,
+    QLabel, QPushButton, QVBoxLayout, QMessageBox, QCheckBox, QSpinBox, QHBoxLayout,
 )
 from PySide6.QtCore import QSettings
 from app.api.client import CookbookClient
@@ -35,6 +35,17 @@ class SettingsDialog(QDialog):
         self._verify_ssl.setChecked(True)
         form.addRow("", self._verify_ssl)
 
+        sync_row = QHBoxLayout()
+        self._sync_interval = QSpinBox()
+        self._sync_interval.setRange(0, 60)
+        self._sync_interval.setValue(5)
+        self._sync_interval.setSuffix(" min")
+        self._sync_interval.setFixedWidth(90)
+        sync_row.addWidget(self._sync_interval)
+        sync_row.addWidget(QLabel("(0 = on close only)"))
+        sync_row.addStretch()
+        form.addRow("Auto-sync every:", sync_row)
+
         layout.addLayout(form)
 
         note = QLabel(
@@ -65,6 +76,7 @@ class SettingsDialog(QDialog):
         self._user.setText(s.value("server/username", ""))
         self._pwd.setText(s.value("server/password", ""))
         self._verify_ssl.setChecked(s.value("server/verify_ssl", True, type=bool))
+        self._sync_interval.setValue(s.value("sync/interval_minutes", 5, type=int))
 
     def _save_and_accept(self):
         if not self._url.text().strip():
@@ -75,6 +87,7 @@ class SettingsDialog(QDialog):
         s.setValue("server/username", self._user.text().strip())
         s.setValue("server/password", self._pwd.text())
         s.setValue("server/verify_ssl", self._verify_ssl.isChecked())
+        s.setValue("sync/interval_minutes", self._sync_interval.value())
         self.accept()
 
     def _test(self):

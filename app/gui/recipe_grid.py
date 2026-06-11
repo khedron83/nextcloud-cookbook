@@ -227,6 +227,55 @@ class RecipeGrid(QWidget):
                 item.setData(_ROLE_THUMB, px)
                 return
 
+    def refresh_recipe(self, recipe_id, name: str, keywords: str = ""):
+        """Update a card's text in-place without rebuilding the list (preserves thumbnails)."""
+        rid = int(recipe_id)
+        for r in self._all:
+            try:
+                if int(r.recipe_id) == rid:
+                    r.name = name
+                    r.keywords = keywords
+                    break
+            except (TypeError, ValueError):
+                pass
+        for i in range(self._list.count()):
+            item = self._list.item(i)
+            try:
+                if int(item.data(_ROLE_ID) or 0) == rid:
+                    item.setText(name)
+                    break
+            except (TypeError, ValueError):
+                pass
+
+    def remap_recipe_id(self, old_id: int, new_id: int):
+        """Swap a local negative ID for the real server ID after sync."""
+        for r in self._all:
+            try:
+                if int(r.recipe_id) == old_id:
+                    r.recipe_id = new_id
+                    break
+            except (TypeError, ValueError):
+                pass
+        for i in range(self._list.count()):
+            item = self._list.item(i)
+            try:
+                if int(item.data(_ROLE_ID) or 0) == old_id:
+                    item.setData(_ROLE_ID, new_id)
+                    break
+            except (TypeError, ValueError):
+                pass
+
+    def insert_recipe(self, summary: RecipeSummary):
+        """Append a new card without rebuilding the list."""
+        self._all.append(summary)
+        item = QListWidgetItem(summary.name)
+        item.setData(_ROLE_ID, summary.recipe_id)
+        item.setData(_ROLE_DATE, "")
+        item.setSizeHint(QSize(CARD_W, CARD_H))
+        self._list.addItem(item)
+        n = self._list.count()
+        self._count_label.setText(f"{n} recipe{'s' if n != 1 else ''}")
+
     def recipe_ids(self) -> list[int]:
         return [r.recipe_id for r in self._all]
 

@@ -703,7 +703,7 @@ class MainWindow(QMainWindow):
             dlg.setIconPixmap(QIcon(str(icon_path)).pixmap(64, 64))
         dlg.setText("<b>Nextcloud Cookbook</b>")
         dlg.setInformativeText(
-            "Version 1.0\n\n"
+            "Version 1.1.0\n\n"
             "A desktop client for the Nextcloud Cookbook app.\n\n"
             "Manage, browse, and plan your recipes directly\n"
             "from your Nextcloud instance."

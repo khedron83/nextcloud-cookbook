@@ -359,6 +359,28 @@ class RecipeView(QWidget):
             self._meta_grid.addWidget(key_lbl, row, 1)
             self._meta_grid.addWidget(url_lbl, row, 2)
             row += 1
+        if recipe.rating:
+            icon_lbl = QLabel("⭐")
+            icon_lbl.setStyleSheet("font-size: 13px;")
+            key_lbl = QLabel("Rating")
+            key_lbl.setStyleSheet("font-weight: bold; font-size: 12px;")
+            star_container = QWidget()
+            star_container.setStyleSheet("background: transparent;")
+            star_row = QHBoxLayout(star_container)
+            star_row.setContentsMargins(0, 0, 0, 0)
+            star_row.setSpacing(1)
+            for j in range(5):
+                s = QLabel("★" if j < recipe.rating else "☆")
+                s.setStyleSheet(
+                    "font-size: 15px; border: none; background: transparent; "
+                    + ("color: #f59e0b;" if j < recipe.rating else "color: #64748b;")
+                )
+                star_row.addWidget(s)
+            star_row.addStretch()
+            self._meta_grid.addWidget(icon_lbl, row, 0)
+            self._meta_grid.addWidget(key_lbl, row, 1)
+            self._meta_grid.addWidget(star_container, row, 2)
+            row += 1
         self._meta_frame.setVisible(row > 0)
 
         # Description

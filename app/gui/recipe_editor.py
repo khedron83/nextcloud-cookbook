@@ -2,9 +2,9 @@ import re
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel,
     QLineEdit, QTextEdit, QPushButton, QScrollArea, QFrame,
-    QGroupBox, QSpinBox, QMessageBox, QStackedWidget,
+    QGroupBox, QSpinBox, QMessageBox, QStackedWidget, QCompleter,
 )
-from PySide6.QtCore import Signal, Qt
+from PySide6.QtCore import Signal, Qt, QStringListModel
 from PySide6.QtGui import QFont, QKeySequence, QShortcut
 from app.models import Recipe, minutes_to_duration, parse_duration
 
@@ -12,6 +12,32 @@ from app.models import Recipe, minutes_to_duration, parse_duration
 def _strip_prefix(line: str) -> str:
     """Remove leading bullets or numbers: '1. ', '• ', '- ', '* '"""
     return re.sub(r'^[\d]+[.)]\s*|^[•\-\*]\s*', '', line)
+
+
+class _ClickableStar(QLabel):
+    clicked = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__("☆", parent)
+        self.setFixedSize(26, 26)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setStyleSheet("font-size: 18px; color: #94a3b8;")
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
+
+
+class _TagCompleter(QCompleter):
+    """Completes the last comma-separated token in the keywords field."""
+
+    def splitPath(self, path: str) -> list[str]:
+        return [path.split(",")[-1].strip()]
+
+    def pathFromIndex(self, index) -> str:
+        return index.data()
 
 
 class _DynamicList(QWidget):
@@ -230,11 +256,29 @@ class RecipeEditor(QWidget):
         self._category = QLineEdit()
         bf.addRow("Category:", self._category)
         self._keywords = QLineEdit()
-        self._keywords.setPlaceholderText("tag1,tag2,tag3")
+        self._keywords.setPlaceholderText("tag1, tag2, tag3")
         bf.addRow("Keywords:", self._keywords)
+        self._tag_model = QStringListModel([], self)
+        self._tag_completer = _TagCompleter(self._tag_model, self)
+        self._tag_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self._tag_completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self._keywords.setCompleter(self._tag_completer)
+        self._tag_completer.activated.connect(self._on_tag_completed)
         self._yield = QLineEdit()
         self._yield.setPlaceholderText("4 servings")
         bf.addRow("Yield:", self._yield)
+        self._rating = 0
+        self._star_labels: list[_ClickableStar] = []
+        star_row = QHBoxLayout()
+        star_row.setSpacing(2)
+        star_row.setContentsMargins(0, 0, 0, 0)
+        for i in range(1, 6):
+            star = _ClickableStar()
+            star.clicked.connect(lambda n=i: self._set_rating(n))
+            self._star_labels.append(star)
+            star_row.addWidget(star)
+        star_row.addStretch()
+        bf.addRow("Rating:", star_row)
         vbox.addWidget(basic)
 
         # Timing
@@ -278,6 +322,29 @@ class RecipeEditor(QWidget):
         cancel_sc.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         cancel_sc.activated.connect(self.cancel_requested)
 
+    def _set_rating(self, n: int):
+        self._rating = 0 if self._rating == n else n
+        self._refresh_stars()
+
+    def _refresh_stars(self):
+        for i, star in enumerate(self._star_labels):
+            if i < self._rating:
+                star.setText("★")
+                star.setStyleSheet("font-size: 18px; color: #f59e0b;")
+            else:
+                star.setText("☆")
+                star.setStyleSheet("font-size: 18px; color: #94a3b8;")
+
+    def _on_tag_completed(self, text: str):
+        parts = [p.strip() for p in self._keywords.text().split(",")]
+        parts[-1] = text
+        new_text = ", ".join(p for p in parts if p) + ", "
+        self._keywords.setText(new_text)
+        self._keywords.setCursorPosition(len(new_text))
+
+    def set_keyword_suggestions(self, tags: list[str]):
+        self._tag_model.setStringList(sorted(tags, key=str.casefold))
+
     def _on_import(self):
         from PySide6.QtWidgets import QInputDialog
         url, ok = QInputDialog.getText(self, "Import Recipe", "Enter recipe URL:")
@@ -303,6 +370,7 @@ class RecipeEditor(QWidget):
             recipe_ingredient=self._ingredients.get_values(),
             recipe_instructions=self._instructions.get_values(),
             tools=self._tools.get_values(),
+            rating=self._rating,
         )
         self.save_requested.emit(recipe)
 
@@ -320,6 +388,8 @@ class RecipeEditor(QWidget):
         self._ingredients.set_values(recipe.recipe_ingredient)
         self._instructions.set_values(recipe.recipe_instructions)
         self._tools.set_values(recipe.tools)
+        self._rating = recipe.rating
+        self._refresh_stars()
 
     def load_new(self):
         self._recipe = None
@@ -335,3 +405,5 @@ class RecipeEditor(QWidget):
         self._ingredients.set_values([])
         self._instructions.set_values([])
         self._tools.set_values([])
+        self._rating = 0
+        self._refresh_stars()

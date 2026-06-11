@@ -111,6 +111,7 @@ class Recipe:
     nutrition: Optional[Nutrition] = None
     date_created: str = ""
     date_modified: str = ""
+    rating: int = 0
 
     @classmethod
     def from_api(cls, data: dict) -> "Recipe":
@@ -128,6 +129,14 @@ class Recipe:
         nutrition = None
         if data.get("nutrition"):
             nutrition = Nutrition.from_api(data["nutrition"])
+
+        rating = 0
+        agg = data.get("aggregateRating")
+        if agg and isinstance(agg, dict):
+            try:
+                rating = max(0, min(5, round(float(agg.get("ratingValue") or 0))))
+            except (ValueError, TypeError):
+                pass
 
         return cls(
             id=data.get("id"),
@@ -147,6 +156,7 @@ class Recipe:
             nutrition=nutrition,
             date_created=data.get("dateCreated", ""),
             date_modified=data.get("dateModified", ""),
+            rating=rating,
         )
 
     def to_api(self) -> dict:
@@ -174,4 +184,10 @@ class Recipe:
             data["id"] = self.id
         if self.nutrition:
             data["nutrition"] = self.nutrition.to_api()
+        if self.rating > 0:
+            data["aggregateRating"] = {
+                "@type": "AggregateRating",
+                "ratingValue": str(self.rating),
+                "ratingCount": "1",
+            }
         return data

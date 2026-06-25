@@ -1,9 +1,0 @@
-[Desktop Entry]
-Name=Nextcloud Cookbook
-Comment=Desktop client for Nextcloud Cookbook
-Exec=nextcloud-cookbook
-Icon=io.github.khedron83.NextcloudCookbook
-Type=Application
-Categories=Network;Food;
-Keywords=nextcloud;cookbook;recipes;cooking;
-StartupWMClass=Nextcloud Cookbook

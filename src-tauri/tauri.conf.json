@@ -1,0 +1,33 @@
+{
+  "productName": "Nextcloud Cookbook",
+  "version": "0.1.0",
+  "identifier": "io.github.khedron83.NextcloudCookbook",
+  "build": {
+    "beforeBuildCommand": "npm run build",
+    "beforeDevCommand": "npm run dev",
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Nextcloud Cookbook",
+        "width": 1200,
+        "height": 780,
+        "minWidth": 800,
+        "minHeight": 560
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/icon.png",
+      "icons/icon.ico"
+    ]
+  }
+}

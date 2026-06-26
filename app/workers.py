@@ -1,5 +1,32 @@
+import requests as _requests
 from PySide6.QtCore import QThread, Signal
 from typing import Callable
+
+APP_VERSION = "1.1.0"
+
+
+def _semver_gt(a: str, b: str) -> bool:
+    def parse(s):
+        return [int(x) for x in s.split(".")[:3] if x.isdigit()]
+    return parse(a) > parse(b)
+
+
+class UpdateCheckWorker(QThread):
+    update_available = Signal(str)
+
+    def run(self):
+        try:
+            resp = _requests.get(
+                "https://api.github.com/repos/khedron83/nextcloud-cookbook/releases/latest",
+                headers={"User-Agent": "NextcloudCookbook"},
+                timeout=10,
+            )
+            tag = resp.json().get("tag_name", "")
+            latest = tag.lstrip("v")
+            if latest and _semver_gt(latest, APP_VERSION):
+                self.update_available.emit(tag)
+        except Exception:
+            pass
 
 
 class Worker(QThread):

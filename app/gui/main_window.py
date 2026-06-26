@@ -13,7 +13,7 @@ _CACHE_PATH = Path.home() / ".local" / "share" / "nextcloud-cookbook" / "cache.j
 
 from app.api.client import CookbookClient
 from app.models import Recipe, RecipeSummary
-from app.workers import Worker, ThumbnailLoader
+from app.workers import Worker, ThumbnailLoader, UpdateCheckWorker, APP_VERSION
 from app.gui.category_sidebar import CategorySidebar
 from app.gui.recipe_grid import RecipeGrid
 from app.gui.recipe_view import RecipeView
@@ -159,10 +159,12 @@ class MainWindow(QMainWindow):
         self._pending: list[dict] = []
         self._syncing: bool = False
         self._last_sync: str = ""
+        self._update_worker = None
         self._sync_timer = QTimer(self)
         self._sync_timer.timeout.connect(self._sync_pending)
         self._build_ui()
         self._init()
+        self._check_for_update()
 
     # ── UI construction ───────────────────────────────────────────────────────
 
@@ -243,6 +245,9 @@ class MainWindow(QMainWindow):
 
         self._offline_banner = self._make_offline_banner()
         root.addWidget(self._offline_banner)
+
+        self._update_banner = self._make_update_banner()
+        root.addWidget(self._update_banner)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         root.addWidget(splitter)
@@ -703,7 +708,7 @@ class MainWindow(QMainWindow):
             dlg.setIconPixmap(QIcon(str(icon_path)).pixmap(64, 64))
         dlg.setText("<b>Nextcloud Cookbook</b>")
         dlg.setInformativeText(
-            "Version 1.1.0\n\n"
+            f"Version {APP_VERSION}\n\n"
             "A desktop client for the Nextcloud Cookbook app.\n\n"
             "Manage, browse, and plan your recipes directly\n"
             "from your Nextcloud instance."
@@ -731,6 +736,43 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f'Renaming "{old_name}"…')
 
     # ── Offline banner & cache ────────────────────────────────────────────────
+
+    def _make_update_banner(self) -> QFrame:
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        banner = QFrame()
+        banner.setStyleSheet(
+            "QFrame { background: #6a4fc8; border: none; }"
+            "QLabel { color: #fff; border: none; }"
+            "QPushButton { color: #fff; border: 1px solid #fff;"
+            "  border-radius: 4px; padding: 2px 10px; }"
+            "QPushButton:hover { background: rgba(255,255,255,0.15); }"
+        )
+        layout = QHBoxLayout(banner)
+        layout.setContentsMargins(12, 6, 12, 6)
+        self._update_label = QLabel()
+        layout.addWidget(self._update_label)
+        layout.addStretch()
+        dl_btn = QPushButton("Download")
+        dl_btn.clicked.connect(lambda: QDesktopServices.openUrl(
+            QUrl("https://github.com/khedron83/nextcloud-cookbook/releases/latest")
+        ))
+        layout.addWidget(dl_btn)
+        dismiss_btn = QPushButton("✕")
+        dismiss_btn.setFixedWidth(28)
+        dismiss_btn.clicked.connect(banner.hide)
+        layout.addWidget(dismiss_btn)
+        banner.setVisible(False)
+        return banner
+
+    def _check_for_update(self):
+        self._update_worker = UpdateCheckWorker()
+        self._update_worker.update_available.connect(self._show_update_banner)
+        self._update_worker.start()
+
+    def _show_update_banner(self, tag: str):
+        self._update_label.setText(f"Update available: {tag}")
+        self._update_banner.show()
 
     def _make_offline_banner(self) -> QFrame:
         banner = QFrame()

@@ -6,12 +6,15 @@ class IngredientIndex(QThread):
     progress = Signal(int, int)   # loaded, total
     ready    = Signal()
 
-    def __init__(self, client, recipe_ids: list[int]):
+    def __init__(self, client, recipe_ids: list[int], cached_data: dict | None = None):
         super().__init__()
-        self._client  = client
-        self._ids     = list(recipe_ids)
-        self._stop    = False
-        self._data: dict[int, list[str]] = {}   # recipe_id → ingredient strings
+        self._client     = client
+        self._ids        = list(recipe_ids)
+        self._stop       = False
+        self._from_cache = cached_data is not None
+        self._data: dict[int, list[str]] = (
+            {int(k): v for k, v in cached_data.items()} if cached_data else {}
+        )
 
     def stop(self):
         self._stop = True
@@ -32,7 +35,13 @@ class IngredientIndex(QThread):
             if any(q in ing.lower() for ing in ings)
         }
 
+    def to_dict(self) -> dict:
+        return {str(k): v for k, v in self._data.items()}
+
     def run(self):
+        if self._from_cache:
+            self.ready.emit()
+            return
         total = len(self._ids)
         for i, rid in enumerate(self._ids):
             if self._stop:

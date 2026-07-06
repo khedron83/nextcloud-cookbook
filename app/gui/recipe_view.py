@@ -8,6 +8,7 @@ from PySide6.QtCore import Signal, Qt, QRect, QSize, QPoint, QUrl
 from PySide6.QtGui import QPixmap, QFont, QDesktopServices, QKeySequence, QShortcut
 from app.models import Recipe, parse_duration
 from app.gui.unit_converter import convert_ingredient, convert_instruction, scale_ingredient
+from app.gui.icons import theme_icon
 import re
 
 
@@ -82,7 +83,7 @@ class _ScaledImage(QLabel):
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setMinimumSize(200, 180)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.setStyleSheet("background: #1e2a3a; border-radius: 8px;")
+        self.setStyleSheet("background: palette(alternateBase); border-radius: 8px;")
 
     def set_pixmap(self, px: QPixmap):
         self._source = px
@@ -91,7 +92,7 @@ class _ScaledImage(QLabel):
     def clear_pixmap(self):
         self._source = None
         self.clear()
-        self.setStyleSheet("background: #1e2a3a; border-radius: 8px;")
+        self.setStyleSheet("background: palette(alternateBase); border-radius: 8px;")
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -104,7 +105,7 @@ class _ScaledImage(QLabel):
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
-            self.setStyleSheet("background: #000; border-radius: 6px;")
+            self.setStyleSheet("background: black; border-radius: 6px;")
             super().setPixmap(scaled)
 
 
@@ -134,7 +135,11 @@ class RecipeView(QWidget):
         bar.setObjectName("actionBar")
         bl = QHBoxLayout(bar)
         bl.setContentsMargins(12, 6, 12, 6)
-        back_btn = QPushButton("← Back")
+        back_icon = theme_icon("go-previous", "arrow-left")
+        back_btn = QPushButton() if back_icon else QPushButton("← Back")
+        if back_icon:
+            back_btn.setIcon(back_icon)
+            back_btn.setText("Back")
         back_btn.setObjectName("backBtn")
         back_btn.clicked.connect(self.back_requested)
         bl.addWidget(back_btn)
@@ -159,11 +164,6 @@ class RecipeView(QWidget):
         for btn in (self._edit_btn, self._convert_btn, self._del_btn):
             bl.addWidget(btn)
         outer.addWidget(bar)
-
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.HLine)
-        sep.setFrameShadow(QFrame.Shadow.Sunken)
-        outer.addWidget(sep)
 
         # ── Scroll area ───────────────────────────────────────────────────────
         scroll = QScrollArea()
@@ -211,8 +211,8 @@ class RecipeView(QWidget):
         self._meta_frame = QFrame()
         self._meta_frame.setFrameShape(QFrame.Shape.StyledPanel)
         self._meta_frame.setStyleSheet(
-            "QFrame { border-radius: 8px; background: #1e2a3a; border: 1px solid #243447; } "
-            "QLabel { border: none; background: transparent; color: #e2e8f0; }"
+            "QFrame { border-radius: 8px; background: palette(alternateBase); border: 1px solid palette(mid); } "
+            "QLabel { border: none; background: transparent; color: palette(windowText); }"
         )
         self._meta_grid = QGridLayout(self._meta_frame)
         self._meta_grid.setContentsMargins(12, 10, 12, 10)
@@ -228,7 +228,7 @@ class RecipeView(QWidget):
         # ── Description ───────────────────────────────────────────────────────
         self._desc = QLabel()
         self._desc.setWordWrap(True)
-        self._desc.setStyleSheet("color: #c8d8e8; font-size: 13px; line-height: 1.5;")
+        self._desc.setStyleSheet("color: palette(text); font-size: 13px; line-height: 1.5;")
         cl.addWidget(self._desc)
 
         # ── Bottom: ingredients + instructions side by side ───────────────────
@@ -274,10 +274,11 @@ class RecipeView(QWidget):
     def _chip(self, text: str) -> QPushButton:
         btn = QPushButton(text)
         btn.setStyleSheet(
-            "QPushButton { background: #1e2a3a; color: #94a3b8;"
-            "  border: 1px solid #2d3f55; border-radius: 10px;"
+            "QPushButton { background: palette(alternateBase); color: palette(placeholderText);"
+            "  border: 1px solid palette(mid); border-radius: 10px;"
             "  padding: 3px 10px; font-size: 11px; }"
-            "QPushButton:hover { background: #2563eb; color: white; border-color: #2563eb; }"
+            "QPushButton:hover { background: palette(highlight); color: palette(highlightedText);"
+            "  border-color: palette(highlight); }"
         )
         btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -373,7 +374,7 @@ class RecipeView(QWidget):
                 s = QLabel("★" if j < recipe.rating else "☆")
                 s.setStyleSheet(
                     "font-size: 15px; border: none; background: transparent; "
-                    + ("color: #f59e0b;" if j < recipe.rating else "color: #64748b;")
+                    + ("color: palette(highlight);" if j < recipe.rating else "color: palette(placeholderText);")
                 )
                 star_row.addWidget(s)
             star_row.addStretch()

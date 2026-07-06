@@ -19,123 +19,124 @@ from app.gui.recipe_grid import RecipeGrid
 from app.gui.recipe_view import RecipeView
 from app.gui.recipe_editor import RecipeEditor
 from app.gui.settings_dialog import SettingsDialog
-from app.gui.import_export import ExportDialog, ImportDialog
+from app.gui.import_export import ExportDialog, ImportDialog, ObsidianExportDialog
 from app.gui.ingredient_index import IngredientIndex
 from app.gui.meal_planner import MealPlannerView
+from app.gui.icons import theme_icon
 
 _GRID, _VIEW, _EDIT, _PLANNER = 0, 1, 2, 3
 
 _STYLE = """
 /* ── Base ────────────────────────────────────────────────────────── */
-QMainWindow, QDialog { background: #111827; color: #e2e8f0; }
-QWidget { color: #e2e8f0; font-size: 13px; }
-QLabel  { background: transparent; color: #e2e8f0; }
+QMainWindow, QDialog { background: palette(window); color: palette(windowText); }
+QWidget { color: palette(windowText); font-size: 13px; }
+QLabel  { background: transparent; color: palette(windowText); }
 
 /* ── Sidebar ─────────────────────────────────────────────────────── */
-QWidget#sidebar { background: #1e2a3a; }
+QWidget#sidebar { background: palette(alternateBase); }
 QWidget#sidebar QListWidget {
     background: transparent; border: none;
-    color: #c8d8e8; padding: 4px 8px; outline: 0;
+    color: palette(text); padding: 4px 8px; outline: 0;
 }
 QWidget#sidebar QListWidget::item {
     padding: 9px 10px; border-radius: 6px; margin: 1px 0;
 }
-QWidget#sidebar QListWidget::item:selected { background: #2563eb; color: white; }
-QWidget#sidebar QListWidget::item:hover:!selected { background: rgba(255,255,255,0.07); }
+QWidget#sidebar QListWidget::item:selected { background: palette(highlight); color: palette(highlightedText); }
+QWidget#sidebar QListWidget::item:hover:!selected { background: rgba(127,127,127,0.12); }
 
 /* ── Splitter ────────────────────────────────────────────────────── */
-QSplitter::handle:horizontal { background: #243447; width: 1px; }
+QSplitter::handle:horizontal { background: palette(mid); width: 1px; }
 
 /* ── Action bar ──────────────────────────────────────────────────── */
-QWidget#actionBar { background: #1e2a3a; border-bottom: 1px solid #243447; }
+QWidget#actionBar { background: palette(alternateBase); border-bottom: 1px solid palette(mid); }
 
 /* ── Recipe grid list ────────────────────────────────────────────── */
-QListWidget { background: #111827; border: none; outline: 0; color: #e2e8f0; }
-QListWidget::item:selected       { background: #1d3461; color: #93c5fd; }
-QListWidget::item:hover:!selected { background: #1e2a3a; }
+QListWidget { background: palette(base); border: none; outline: 0; color: palette(windowText); }
+QListWidget::item:selected       { background: palette(highlight); color: palette(highlightedText); }
+QListWidget::item:hover:!selected { background: palette(alternateBase); }
 
 /* ── Buttons ─────────────────────────────────────────────────────── */
 QPushButton {
-    background: #2563eb; color: white; border: none;
-    border-radius: 7px; padding: 7px 16px;
+    background: palette(highlight); color: palette(highlightedText); border: 1px solid transparent;
+    border-radius: 7px; padding: 6px 15px;
     font-size: 13px; font-weight: 500;
 }
-QPushButton:hover   { background: #1d4ed8; color: white; }
-QPushButton:pressed { background: #1e40af; color: white; }
-QPushButton:disabled { background: #243447; color: #64748b; border: 1px solid #2d3f55; }
+QPushButton:hover   { border-color: palette(highlightedText); }
+QPushButton:pressed { background: palette(midlight); color: palette(text); border-color: transparent; }
+QPushButton:disabled { background: palette(mid); color: palette(placeholderText); border: 1px solid palette(midlight); }
+/* ponytail: keep semantic green for active cooking-timer toggle */
 QPushButton:checked       { background: #15803d; color: white; }
-QPushButton:checked:hover { background: #16a34a; color: white; }
-QPushButton#backBtn { background: transparent; color: #94a3b8; border: 1px solid #2d3f55; }
-QPushButton#backBtn:hover { background: #1e2a3a; color: #e2e8f0; }
-QPushButton#editBtn       { background: #0e7490; color: white; }
-QPushButton#editBtn:hover { background: #0891b2; color: white; }
+QPushButton:checked:hover { background: #16a34a; color: white; border-color: white; }
+QPushButton#backBtn { background: transparent; color: palette(placeholderText); border: 1px solid palette(mid); }
+QPushButton#backBtn:hover { background: palette(alternateBase); color: palette(windowText); border-color: palette(mid); }
+QPushButton#editBtn { background: palette(highlight); color: palette(highlightedText); }
+/* ponytail: keep semantic red for destructive delete actions */
 QPushButton#deleteBtn       { background: #b91c1c; color: white; }
 QPushButton#deleteBtn:hover { background: #dc2626; color: white; }
 
 /* ── Inputs ──────────────────────────────────────────────────────── */
 QLineEdit, QTextEdit, QPlainTextEdit {
-    background: #1e2a3a; border: 1px solid #2d3f55; border-radius: 6px;
-    padding: 6px 10px; color: #e2e8f0; selection-background-color: #1d3461;
+    background: palette(base); border: 1px solid palette(mid); border-radius: 6px;
+    padding: 6px 10px; color: palette(text); selection-background-color: palette(highlight);
 }
-QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus { border-color: #2563eb; }
+QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus { border-color: palette(highlight); }
 QSpinBox, QDoubleSpinBox {
-    background: #1e2a3a; border: 1px solid #2d3f55; border-radius: 6px;
-    padding: 4px 8px; color: #e2e8f0;
+    background: palette(base); border: 1px solid palette(mid); border-radius: 6px;
+    padding: 4px 8px; color: palette(text);
 }
-QSpinBox:focus, QDoubleSpinBox:focus { border-color: #2563eb; }
-QSpinBox::up-button, QSpinBox::down-button { background: #2d3f55; border: none; width: 18px; }
-QSpinBox::up-button:hover, QSpinBox::down-button:hover { background: #374151; }
+QSpinBox:focus, QDoubleSpinBox:focus { border-color: palette(highlight); }
+QSpinBox::up-button, QSpinBox::down-button { background: palette(mid); border: none; width: 18px; }
+QSpinBox::up-button:hover, QSpinBox::down-button:hover { background: palette(midlight); }
 QComboBox {
-    background: #1e2a3a; border: 1px solid #2d3f55; border-radius: 6px;
-    padding: 5px 10px; color: #e2e8f0;
+    background: palette(base); border: 1px solid palette(mid); border-radius: 6px;
+    padding: 5px 10px; color: palette(text);
 }
-QComboBox:focus { border-color: #2563eb; }
+QComboBox:focus { border-color: palette(highlight); }
 QComboBox::drop-down { border: none; width: 22px; }
 QComboBox QAbstractItemView {
-    background: #1e2a3a; border: 1px solid #2d3f55; color: #e2e8f0;
-    selection-background-color: #2563eb; outline: 0;
+    background: palette(base); border: 1px solid palette(mid); color: palette(text);
+    selection-background-color: palette(highlight); outline: 0;
 }
 
 /* ── Group boxes ─────────────────────────────────────────────────── */
 QGroupBox {
-    border: 1px solid #243447; border-radius: 8px;
+    border: 1px solid palette(mid); border-radius: 8px;
     margin-top: 12px; padding-top: 8px;
-    color: #e2e8f0; background: transparent;
+    color: palette(windowText); background: transparent;
 }
 QGroupBox::title {
     subcontrol-origin: margin; left: 12px; padding: 0 6px;
-    color: #64748b; font-size: 11px; font-weight: bold;
+    color: palette(placeholderText); font-size: 11px; font-weight: bold;
 }
 
 /* ── Scroll bars ─────────────────────────────────────────────────── */
-QScrollBar:vertical   { background: #111827; width: 8px;  margin: 0; }
-QScrollBar:horizontal { background: #111827; height: 8px; margin: 0; }
-QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
-    background: #374151; border-radius: 4px; min-height: 24px; min-width: 24px;
-}
-QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover { background: #4b5563; }
+QScrollBar:vertical   { background: transparent; width: 8px;  margin: 0; border: none; }
+QScrollBar:horizontal { background: transparent; height: 8px; margin: 0; border: none; }
+QScrollBar::handle:vertical   { background: palette(mid); border-radius: 3px; min-height: 24px; margin: 0 2px; }
+QScrollBar::handle:horizontal { background: palette(mid); border-radius: 3px; min-width:  24px; margin: 2px 0; }
+QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover { background: palette(midlight); }
 QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; }
 
 /* ── Menus ───────────────────────────────────────────────────────── */
-QMenuBar { background: #1e2a3a; color: #c8d8e8; padding: 2px; border-bottom: 1px solid #243447; }
-QMenuBar::item:selected { background: #2d3f55; border-radius: 4px; }
-QMenu { background: #1e2a3a; color: #c8d8e8; border: 1px solid #2d3f55; border-radius: 6px; padding: 4px; }
+QMenuBar { background: palette(alternateBase); color: palette(text); padding: 2px; border-bottom: 1px solid palette(mid); }
+QMenuBar::item:selected { background: palette(mid); border-radius: 4px; }
+QMenu { background: palette(alternateBase); color: palette(text); border: 1px solid palette(mid); border-radius: 6px; padding: 4px; }
 QMenu::item { padding: 6px 24px 6px 12px; border-radius: 4px; }
-QMenu::item:selected { background: #2563eb; color: white; }
-QMenu::separator { background: #2d3f55; height: 1px; margin: 4px 8px; }
+QMenu::item:selected { background: palette(highlight); color: palette(highlightedText); }
+QMenu::separator { background: palette(mid); height: 1px; margin: 4px 8px; }
 
 /* ── Status bar ──────────────────────────────────────────────────── */
-QStatusBar { background: #1e2a3a; color: #64748b; border-top: 1px solid #243447; font-size: 12px; padding: 2px 8px; }
+QStatusBar { background: palette(alternateBase); color: palette(placeholderText); border-top: 1px solid palette(mid); font-size: 12px; padding: 2px 8px; }
 QStatusBar::item { border: none; }
 
 /* ── Misc ────────────────────────────────────────────────────────── */
-QCheckBox { color: #c8d8e8; spacing: 8px; }
-QCheckBox::indicator { width: 16px; height: 16px; border: 1px solid #2d3f55; border-radius: 4px; background: #1e2a3a; }
-QCheckBox::indicator:checked { background: #2563eb; border-color: #2563eb; }
-QFrame[frameShape="4"], QFrame[frameShape="5"] { color: #243447; }
-QScrollArea { background: #111827; border: none; }
-QScrollArea > QWidget > QWidget { background: #111827; }
-QLabel#countLabel { color: #64748b; }
+QCheckBox { color: palette(text); spacing: 8px; }
+QCheckBox::indicator { width: 16px; height: 16px; border: 1px solid palette(mid); border-radius: 4px; background: palette(base); }
+QCheckBox::indicator:checked { background: palette(highlight); border-color: palette(highlight); }
+QFrame[frameShape="4"], QFrame[frameShape="5"] { color: palette(mid); }
+QScrollArea { background: palette(window); border: none; }
+QScrollArea > QWidget > QWidget { background: palette(window); }
+QLabel#countLabel { color: palette(placeholderText); }
 """
 
 
@@ -195,6 +196,10 @@ class MainWindow(QMainWindow):
         export_act = QAction("&Export ZIP…", self)
         export_act.triggered.connect(self._export_zip)
         file_menu.addAction(export_act)
+
+        obsidian_act = QAction("Export to &Obsidian…", self)
+        obsidian_act.triggered.connect(self._export_obsidian)
+        file_menu.addAction(obsidian_act)
 
         file_menu.addSeparator()
 
@@ -267,6 +272,7 @@ class MainWindow(QMainWindow):
         self._grid = RecipeGrid()
         self._grid.recipe_selected.connect(self._on_recipe_selected)
         self._grid.back_requested.connect(self._back_from_keyword)
+        self._grid.open_settings_requested.connect(self._open_settings)
         self._stack.addWidget(self._grid)           # _GRID = 0
 
         self._view = RecipeView()
@@ -293,6 +299,48 @@ class MainWindow(QMainWindow):
         self._sync_label.setStyleSheet("padding: 0 10px; font-size: 12px;")
         self.statusBar().addPermanentWidget(self._sync_label)
 
+        self._toast = self._make_toast()
+
+    # ── Toast (save/sync confirmation) ─────────────────────────────────────────
+
+    def _make_toast(self) -> QLabel:
+        lbl = QLabel(self)
+        lbl.setWordWrap(True)
+        lbl.setVisible(False)
+        self._toast_timer = QTimer(self)
+        self._toast_timer.setSingleShot(True)
+        self._toast_timer.timeout.connect(lbl.hide)
+        return lbl
+
+    def _show_toast(self, text: str, error: bool = False):
+        color = "#b91c1c" if error else "palette(highlight)"
+        text_color = "white" if error else "palette(highlightedText)"
+        self._toast.setStyleSheet(
+            f"QLabel {{ background: {color}; color: {text_color}; border-radius: 8px;"
+            " padding: 8px 16px; font-size: 12px; font-weight: 500; }"
+        )
+        self._toast.setText(text)
+        self._toast.adjustSize()
+        self._position_toast()
+        self._toast.show()
+        self._toast.raise_()
+        self._toast_timer.start(2800)
+
+    def _position_toast(self):
+        margin = 16
+        top = self.menuBar().height() + margin
+        if self._offline_banner.isVisible():
+            top += self._offline_banner.height()
+        if self._update_banner.isVisible():
+            top += self._update_banner.height()
+        x = max(0, self.width() - self._toast.width() - margin)
+        self._toast.move(x, top)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self._toast.isVisible():
+            self._position_toast()
+
     # ── Bootstrap ─────────────────────────────────────────────────────────────
 
     def _init(self):
@@ -301,6 +349,7 @@ class MainWindow(QMainWindow):
         self._client = SettingsDialog.get_client()
         if not self._client:
             self.statusBar().showMessage("Configure your Nextcloud server in Settings.")
+            self._grid.show_no_server()
             self._open_settings()
         else:
             self._load()
@@ -314,6 +363,8 @@ class MainWindow(QMainWindow):
         if not self._client:
             return
         self.statusBar().showMessage("Loading…")
+        if not self._all_recipes:
+            self._grid.show_loading()
         client = self._client
 
         def _fetch():
@@ -339,6 +390,7 @@ class MainWindow(QMainWindow):
                     self._on_categories_loaded(cached.get('categories', []))
                 else:
                     self.statusBar().showMessage("Offline — no cached data available.")
+                    self._grid.set_recipes([])
 
         self._run(_fetch, _on_fetched)
 
@@ -381,7 +433,8 @@ class MainWindow(QMainWindow):
             self._ing_index.stop()
             self._ing_index.wait()
         ids = [r.recipe_id for r in self._all_recipes]
-        self._ing_index = IngredientIndex(self._client, ids)
+        cached = self._load_ingredient_cache(ids)
+        self._ing_index = IngredientIndex(self._client, ids, cached_data=cached)
         self._ing_index.progress.connect(self._on_index_progress)
         self._ing_index.ready.connect(self._on_index_ready)
         self._ing_index.start()
@@ -394,7 +447,9 @@ class MainWindow(QMainWindow):
     def _on_index_ready(self):
         self._grid.set_ingredient_index(self._ing_index)
         self._planner.set_ingredient_index(self._ing_index)
-        self.statusBar().showMessage("Ingredient index ready.")
+        if not self._ing_index._from_cache:
+            self.statusBar().showMessage("Ingredient index ready.")
+            self._save_ingredient_cache()
 
     def _on_categories_loaded(self, data: list):
         self._sidebar.set_categories(data)
@@ -635,8 +690,13 @@ class MainWindow(QMainWindow):
             # Edit: update the existing card in-place (thumbnail untouched)
             self._grid.refresh_recipe(int(recipe.id), recipe.name, recipe.keywords)
 
+        if self._ing_index:
+            rid = int(data.get("id", 0))
+            if rid:
+                self._ing_index._data[rid] = recipe.recipe_ingredient
+
         self._update_sync_label()
-        self.statusBar().showMessage(f"Saved locally: {recipe.name}")
+        self._show_toast(f"Saved locally: {recipe.name}")
 
     def _on_saved(self, data):
         # create returns a dict; update returns the recipe ID as an int
@@ -651,7 +711,7 @@ class MainWindow(QMainWindow):
         self._stack.setCurrentIndex(_VIEW)
         self._stay_on_view = True
         self._load()
-        self.statusBar().showMessage(f"Saved: {self._current.name}")
+        self._show_toast(f"Saved: {self._current.name}")
         if self._current.id:
             self._run_silent(
                 self._client.get_recipe_image,
@@ -684,6 +744,11 @@ class MainWindow(QMainWindow):
         if not self._client:
             return
         ExportDialog(self._client, self).exec()
+
+    def _export_obsidian(self):
+        if not self._client:
+            return
+        ObsidianExportDialog(self._client, self).exec()
 
     def _import_zip(self):
         if not self._client:
@@ -742,10 +807,10 @@ class MainWindow(QMainWindow):
         from PySide6.QtGui import QDesktopServices
         banner = QFrame()
         banner.setStyleSheet(
-            "QFrame { background: #6a4fc8; border: none; }"
-            "QLabel { color: #fff; border: none; }"
-            "QPushButton { color: #fff; border: 1px solid #fff;"
-            "  border-radius: 4px; padding: 2px 10px; }"
+            "QFrame { background: palette(highlight); border: none; }"
+            "QLabel { color: palette(highlightedText); border: none; }"
+            "QPushButton { color: palette(highlightedText); border: 1px solid palette(highlightedText);"
+            "  border-radius: 4px; padding: 2px 10px; background: transparent; }"
             "QPushButton:hover { background: rgba(255,255,255,0.15); }"
         )
         layout = QHBoxLayout(banner)
@@ -758,7 +823,12 @@ class MainWindow(QMainWindow):
             QUrl("https://github.com/khedron83/nextcloud-cookbook/releases/latest")
         ))
         layout.addWidget(dl_btn)
-        dismiss_btn = QPushButton("✕")
+        dismiss_btn = QPushButton()
+        dismiss_icon = theme_icon("window-close", "dialog-close")
+        if dismiss_icon:
+            dismiss_btn.setIcon(dismiss_icon)
+        else:
+            dismiss_btn.setText("✕")
         dismiss_btn.setFixedWidth(28)
         dismiss_btn.clicked.connect(banner.hide)
         layout.addWidget(dismiss_btn)
@@ -776,16 +846,24 @@ class MainWindow(QMainWindow):
 
     def _make_offline_banner(self) -> QFrame:
         banner = QFrame()
+        # ponytail: amber hex is intentional — no "warning" role in QPalette
         banner.setStyleSheet(
             "QFrame { background: #856404; border: none; }"
             "QLabel { color: #fff; font-weight: bold; border: none; }"
             "QPushButton { color: #fff; border: 1px solid #fff;"
-            "  border-radius: 4px; padding: 2px 10px; }"
+            "  border-radius: 4px; padding: 2px 10px; background: transparent; }"
             "QPushButton:hover { background: rgba(255,255,255,0.15); }"
         )
         layout = QHBoxLayout(banner)
         layout.setContentsMargins(12, 6, 12, 6)
-        layout.addWidget(QLabel("⚠  Offline — showing cached data"))
+        warning_icon = theme_icon("dialog-warning", "emblem-warning")
+        if warning_icon:
+            icon_lbl = QLabel()
+            icon_lbl.setPixmap(warning_icon.pixmap(16, 16))
+            layout.addWidget(icon_lbl)
+            layout.addWidget(QLabel("Offline — showing cached data"))
+        else:
+            layout.addWidget(QLabel("⚠  Offline — showing cached data"))
         layout.addStretch()
         retry_btn = QPushButton("Retry")
         retry_btn.clicked.connect(self._load)
@@ -829,6 +907,29 @@ class MainWindow(QMainWindow):
             return json.loads(_CACHE_PATH.read_text(encoding='utf-8'))
         except Exception:
             return None
+
+    def _load_ingredient_cache(self, current_ids: list[int]) -> dict | None:
+        cached = self._load_cache() or {}
+        idx = cached.get("ingredient_index")
+        if not idx:
+            return None
+        if sorted(idx.get("ids", [])) != sorted(current_ids):
+            return None
+        return idx.get("data")
+
+    def _save_ingredient_cache(self):
+        if not self._ing_index:
+            return
+        try:
+            existing = self._load_cache() or {}
+            existing["ingredient_index"] = {
+                "ids": [r.recipe_id for r in self._all_recipes],
+                "data": self._ing_index.to_dict(),
+            }
+            _CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            _CACHE_PATH.write_text(json.dumps(existing), encoding="utf-8")
+        except Exception:
+            pass
 
     # ── Local-first sync ─────────────────────────────────────────────────────
 
@@ -932,9 +1033,9 @@ class MainWindow(QMainWindow):
 
             if failed:
                 errors = "; ".join(msg for _, msg in failed[:2])
-                self.statusBar().showMessage(f"Sync: {len(synced)} ok — {errors}")
+                self._show_toast(f"Sync: {len(synced)} ok — {errors}", error=True)
             else:
-                self.statusBar().showMessage(f"Synced {len(synced)} change(s) at {self._last_sync}.")
+                self._show_toast(f"Synced {len(synced)} change(s) at {self._last_sync}.")
 
         self._run(_do_sync, _on_done)
 
@@ -951,13 +1052,13 @@ class MainWindow(QMainWindow):
         if self._offline:
             suffix = f" · {self._last_sync}" if self._last_sync else ""
             self._sync_label.setText(f"Offline{suffix}")
-            self._sync_label.setStyleSheet("color: #94a3b8; padding: 0 10px; font-size: 12px;")
+            self._sync_label.setStyleSheet("color: palette(placeholderText); padding: 0 10px; font-size: 12px;")
         elif n:
             self._sync_label.setText(f"● {n} pending")
-            self._sync_label.setStyleSheet("color: #f59e0b; padding: 0 10px; font-size: 12px;")
+            self._sync_label.setStyleSheet("color: palette(highlight); padding: 0 10px; font-size: 12px;")
         elif self._last_sync:
             self._sync_label.setText(f"✓ {self._last_sync}")
-            self._sync_label.setStyleSheet("color: #4ade80; padding: 0 10px; font-size: 12px;")
+            self._sync_label.setStyleSheet("color: palette(placeholderText); padding: 0 10px; font-size: 12px;")
         else:
             self._sync_label.setText("")
 

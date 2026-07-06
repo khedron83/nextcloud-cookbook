@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Signal, Qt, QStringListModel
 from PySide6.QtGui import QFont, QKeySequence, QShortcut
 from app.models import Recipe, minutes_to_duration, parse_duration
+from app.gui.icons import theme_icon
 
 
 def _strip_prefix(line: str) -> str:
@@ -21,7 +22,7 @@ class _ClickableStar(QLabel):
         super().__init__("☆", parent)
         self.setFixedSize(26, 26)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setStyleSheet("font-size: 18px; color: #94a3b8;")
+        self.setStyleSheet("font-size: 18px; color: palette(placeholderText);")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
     def mousePressEvent(self, event):
@@ -116,7 +117,12 @@ class _DynamicList(QWidget):
         hl = QHBoxLayout(row)
         hl.setContentsMargins(0, 0, 0, 0)
         edit = self._make_edit(text)
-        rm = QPushButton("✕")
+        rm_icon = theme_icon("list-remove", "edit-delete")
+        rm = QPushButton()
+        if rm_icon:
+            rm.setIcon(rm_icon)
+        else:
+            rm.setText("✕")
         rm.setFixedWidth(28)
         rm.clicked.connect(lambda: self._remove(row))
         hl.addWidget(edit)
@@ -203,8 +209,9 @@ class RecipeEditor(QWidget):
 
         # Header bar
         bar = QWidget()
+        bar.setObjectName("actionBar")
         bar_layout = QHBoxLayout(bar)
-        bar_layout.setContentsMargins(8, 4, 8, 4)
+        bar_layout.setContentsMargins(12, 6, 12, 6)
         self._header = QLabel("New Recipe")
         hdr_font = QFont()
         hdr_font.setPointSize(14)
@@ -222,11 +229,6 @@ class RecipeEditor(QWidget):
         for w in (import_btn, cancel_btn, save_btn):
             bar_layout.addWidget(w)
         outer.addWidget(bar)
-
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.HLine)
-        sep.setFrameShadow(QFrame.Shadow.Sunken)
-        outer.addWidget(sep)
 
         # Scrollable form
         scroll = QScrollArea()
@@ -330,10 +332,10 @@ class RecipeEditor(QWidget):
         for i, star in enumerate(self._star_labels):
             if i < self._rating:
                 star.setText("★")
-                star.setStyleSheet("font-size: 18px; color: #f59e0b;")
+                star.setStyleSheet("font-size: 18px; color: palette(highlight);")
             else:
                 star.setText("☆")
-                star.setStyleSheet("font-size: 18px; color: #94a3b8;")
+                star.setStyleSheet("font-size: 18px; color: palette(placeholderText);")
 
     def _on_tag_completed(self, text: str):
         parts = [p.strip() for p in self._keywords.text().split(",")]

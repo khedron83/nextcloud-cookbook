@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import (
     QDialog, QFormLayout, QLineEdit, QDialogButtonBox,
     QLabel, QPushButton, QVBoxLayout, QMessageBox, QCheckBox, QSpinBox, QHBoxLayout,
+    QFileDialog,
 )
 from PySide6.QtCore import QSettings
 from app.api.client import CookbookClient
@@ -34,6 +35,16 @@ class SettingsDialog(QDialog):
         self._verify_ssl = QCheckBox("Verify SSL certificate")
         self._verify_ssl.setChecked(True)
         form.addRow("", self._verify_ssl)
+
+        obsidian_row = QHBoxLayout()
+        self._obsidian_folder = QLineEdit()
+        self._obsidian_folder.setPlaceholderText("Optional — leave blank to be prompted each time")
+        obsidian_row.addWidget(self._obsidian_folder)
+        browse_btn = QPushButton("Browse…")
+        browse_btn.setFixedWidth(72)
+        browse_btn.clicked.connect(self._browse_obsidian)
+        obsidian_row.addWidget(browse_btn)
+        form.addRow("Obsidian vault:", obsidian_row)
 
         sync_row = QHBoxLayout()
         self._sync_interval = QSpinBox()
@@ -77,6 +88,7 @@ class SettingsDialog(QDialog):
         self._pwd.setText(s.value("server/password", ""))
         self._verify_ssl.setChecked(s.value("server/verify_ssl", True, type=bool))
         self._sync_interval.setValue(s.value("sync/interval_minutes", 5, type=int))
+        self._obsidian_folder.setText(s.value("export/obsidian_folder", ""))
 
     def _save_and_accept(self):
         if not self._url.text().strip():
@@ -88,7 +100,13 @@ class SettingsDialog(QDialog):
         s.setValue("server/password", self._pwd.text())
         s.setValue("server/verify_ssl", self._verify_ssl.isChecked())
         s.setValue("sync/interval_minutes", self._sync_interval.value())
+        s.setValue("export/obsidian_folder", self._obsidian_folder.text().strip())
         self.accept()
+
+    def _browse_obsidian(self):
+        path = QFileDialog.getExistingDirectory(self, "Select Obsidian Vault Folder")
+        if path:
+            self._obsidian_folder.setText(path)
 
     def _test(self):
         url = self._url.text().strip()

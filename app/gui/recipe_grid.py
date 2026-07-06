@@ -1,12 +1,13 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
     QListWidget, QListWidgetItem, QStyledItemDelegate,
-    QStyle, QLabel, QPushButton, QComboBox,
+    QStyle, QLabel, QPushButton, QComboBox, QStackedWidget,
 )
-from PySide6.QtCore import Signal, Qt, QSize, QRect
-from PySide6.QtGui import QPixmap, QFont, QPen, QColor, QPainter, QKeySequence, QShortcut
+from PySide6.QtCore import Signal, Qt, QSize, QRect, QTimer
+from PySide6.QtGui import QPixmap, QFont, QPen, QColor, QPainter, QPalette, QKeySequence, QShortcut
 
 from app.models import RecipeSummary
+from app.gui.icons import theme_icon
 
 _ROLE_ID    = Qt.ItemDataRole.UserRole
 _ROLE_DATE  = Qt.ItemDataRole.UserRole + 1
@@ -18,25 +19,34 @@ THUMB_H = 150   # image portion height
 
 
 class _CardDelegate(QStyledItemDelegate):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._w = CARD_W
+
+    def set_cell_width(self, w: int):
+        self._w = w
+
     def sizeHint(self, option, index):
-        return QSize(CARD_W, CARD_H)
+        return QSize(self._w, CARD_H)
 
     def paint(self, painter: QPainter, option, index):
         painter.save()
         r = option.rect
+        w, h = r.width(), r.height()
         selected = bool(option.state & QStyle.StateFlag.State_Selected)
 
         # Card background + border
-        bg     = QColor("#1d3461") if selected else QColor("#1e2a3a")
-        border = QColor("#2563eb") if selected else QColor("#2d3f55")
-        painter.fillRect(r, QColor("#111827"))  # gap between cards
+        pal    = option.palette
+        bg     = pal.color(QPalette.ColorRole.Highlight if selected else QPalette.ColorRole.AlternateBase)
+        border = pal.color(QPalette.ColorRole.Highlight if selected else QPalette.ColorRole.Mid)
+        painter.fillRect(r, pal.color(QPalette.ColorRole.Base))
         painter.fillRect(r.adjusted(2, 2, -2, -2), bg)
         painter.setPen(QPen(border, 1))
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.drawRoundedRect(r.adjusted(2, 2, -3, -3), 8, 8)
 
         # Image area (top portion)
-        img_rect = QRect(r.x() + 2, r.y() + 2, CARD_W - 4, THUMB_H)
+        img_rect = QRect(r.x() + 2, r.y() + 2, w - 4, THUMB_H)
         thumb: QPixmap | None = index.data(_ROLE_THUMB)
         if thumb and not thumb.isNull():
             scaled = thumb.scaled(
@@ -50,16 +60,16 @@ class _CardDelegate(QStyledItemDelegate):
             painter.drawPixmap(ox, oy, scaled)
             painter.setClipping(False)
         else:
-            painter.fillRect(img_rect, QColor("#243447"))
+            painter.fillRect(img_rect, pal.color(QPalette.ColorRole.Mid))
             f = QFont()
             f.setPointSize(28)
             painter.setFont(f)
-            painter.setPen(QColor("#374151"))
+            painter.setPen(pal.color(QPalette.ColorRole.Midlight))
             painter.drawText(img_rect, Qt.AlignmentFlag.AlignCenter, "🍽")
 
         # Text area (below image)
-        text_color  = QColor("#93c5fd") if selected else QColor("#e2e8f0")
-        muted_color = QColor("#93c5fd") if selected else QColor("#64748b")
+        text_color  = pal.color(QPalette.ColorRole.HighlightedText if selected else QPalette.ColorRole.Text)
+        muted_color = pal.color(QPalette.ColorRole.HighlightedText if selected else QPalette.ColorRole.PlaceholderText)
 
         text_y = r.y() + THUMB_H + 8
         name = index.data(Qt.ItemDataRole.DisplayRole) or ""
@@ -69,7 +79,7 @@ class _CardDelegate(QStyledItemDelegate):
         nf.setPointSize(10)
         painter.setFont(nf)
         painter.setPen(text_color)
-        name_rect = QRect(r.x() + 8, text_y, CARD_W - 16, CARD_H - THUMB_H - 30)
+        name_rect = QRect(r.x() + 8, text_y, w - 16, h - THUMB_H - 30)
         painter.drawText(name_rect,
                          Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap,
                          name)
@@ -81,7 +91,7 @@ class _CardDelegate(QStyledItemDelegate):
             painter.setFont(df)
             painter.setPen(muted_color)
             painter.drawText(
-                QRect(r.x() + 8, r.y() + CARD_H - 22, CARD_W - 16, 18),
+                QRect(r.x() + 8, r.y() + h - 22, w - 16, 18),
                 Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
                 date,
             )
@@ -92,28 +102,42 @@ class _CardDelegate(QStyledItemDelegate):
 class RecipeGrid(QWidget):
     recipe_selected = Signal(int)
     back_requested  = Signal()
+    open_settings_requested = Signal()
+
+    _CONTENT, _EMPTY = 0, 1
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._all: list[RecipeSummary] = []
         self._index = None
         self._thumb_cache: dict[int, QPixmap] = {}
+        self._cell_w = CARD_W
+        self._delegate = _CardDelegate()
         self._build_ui()
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(6)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
         self._back_btn = QPushButton()
+        self._back_icon = theme_icon("go-previous", "arrow-left")
+        if self._back_icon:
+            self._back_btn.setIcon(self._back_icon)
         self._back_btn.setVisible(False)
         self._back_btn.clicked.connect(self.back_requested)
         layout.addWidget(self._back_btn)
 
-        bar = QHBoxLayout()
+        self._bar_widget = QWidget()
+        bar = QHBoxLayout(self._bar_widget)
+        bar.setContentsMargins(8, 6, 8, 4)
         self._search = QLineEdit()
         self._search.setPlaceholderText("Filter…")
-        self._search.textChanged.connect(self._apply_filter)
+        self._debounce = QTimer(self)
+        self._debounce.setSingleShot(True)
+        self._debounce.setInterval(150)
+        self._debounce.timeout.connect(self._apply_filter)
+        self._search.textChanged.connect(lambda _: self._debounce.start())
         self._mode = QComboBox()
         self._mode.addItems(["Name", "Ingredient"])
         self._mode.setToolTip("Search by recipe name or ingredient")
@@ -128,7 +152,7 @@ class RecipeGrid(QWidget):
         bar.addWidget(self._mode)
         bar.addWidget(self._sort)
         bar.addWidget(self._count_label)
-        layout.addLayout(bar)
+        layout.addWidget(self._bar_widget)
 
         self._list = QListWidget()
         self._list.setViewMode(QListWidget.ViewMode.IconMode)
@@ -137,15 +161,117 @@ class RecipeGrid(QWidget):
         self._list.setResizeMode(QListWidget.ResizeMode.Adjust)
         self._list.setUniformItemSizes(True)
         self._list.setSpacing(10)
-        self._list.setItemDelegate(_CardDelegate())
+        self._list.setItemDelegate(self._delegate)
         self._list.setMouseTracking(True)
         self._list.itemClicked.connect(lambda item: self.recipe_selected.emit(item.data(_ROLE_ID)))
         self._list.itemActivated.connect(lambda item: self.recipe_selected.emit(item.data(_ROLE_ID)))
-        layout.addWidget(self._list)
+
+        self._content_stack = QStackedWidget()
+        self._content_stack.addWidget(self._list)                    # _CONTENT = 0
+        self._empty_widget = self._make_empty_widget()
+        self._content_stack.addWidget(self._empty_widget)            # _EMPTY = 1
+        layout.addWidget(self._content_stack)
 
         focus_search = QShortcut(QKeySequence("Ctrl+F"), self)
         focus_search.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         focus_search.activated.connect(lambda: (self._search.setFocus(), self._search.selectAll()))
+
+    def _make_empty_widget(self) -> QWidget:
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        v.setSpacing(6)
+
+        self._empty_icon = QLabel()
+        self._empty_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._empty_icon.setStyleSheet("font-size: 40px;")
+
+        self._empty_title = QLabel()
+        self._empty_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._empty_title.setStyleSheet("font-size: 15px; font-weight: 600; color: palette(windowText);")
+
+        self._empty_subtitle = QLabel()
+        self._empty_subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._empty_subtitle.setWordWrap(True)
+        self._empty_subtitle.setMaximumWidth(320)
+        self._empty_subtitle.setStyleSheet("color: palette(placeholderText); font-size: 12px;")
+
+        self._empty_action = QPushButton()
+        self._empty_action.setFixedWidth(160)
+        self._empty_action.setVisible(False)
+        self._empty_action_connected = False
+
+        v.addWidget(self._empty_icon)
+        v.addWidget(self._empty_title)
+        v.addWidget(self._empty_subtitle)
+        v.addSpacing(4)
+        v.addWidget(self._empty_action, 0, Qt.AlignmentFlag.AlignHCenter)
+        return w
+
+    def _connect_empty_action(self, slot) -> None:
+        if self._empty_action_connected:
+            self._empty_action.clicked.disconnect()
+        self._empty_action.clicked.connect(slot)
+        self._empty_action_connected = True
+
+    def show_no_server(self) -> None:
+        """Shown when no Nextcloud server is configured yet."""
+        self._bar_widget.setVisible(False)
+        self._back_btn.setVisible(False)
+        self._empty_icon.setText("⚙")
+        self._empty_title.setText("No server configured")
+        self._empty_subtitle.setText("Connect to your Nextcloud instance to start browsing recipes.")
+        self._empty_action.setText("Open Settings")
+        self._empty_action.setVisible(True)
+        self._connect_empty_action(self.open_settings_requested)
+        self._content_stack.setCurrentIndex(self._EMPTY)
+
+    def show_loading(self) -> None:
+        """Shown briefly while the first fetch of recipes is in flight."""
+        self._empty_icon.setText("⏳")
+        self._empty_title.setText("Loading recipes…")
+        self._empty_subtitle.setText("")
+        self._empty_action.setVisible(False)
+        self._content_stack.setCurrentIndex(self._EMPTY)
+
+    def _show_empty(self, query: str) -> None:
+        if query:
+            self._empty_icon.setText("🔍")
+            self._empty_title.setText("No recipes found")
+            self._empty_subtitle.setText(f'No recipes match "{query}".')
+            self._empty_action.setText("Clear Filter")
+            self._empty_action.setVisible(True)
+            self._connect_empty_action(self._clear_filter)
+        else:
+            self._empty_icon.setText("🍽")
+            self._empty_title.setText("No recipes here")
+            self._empty_subtitle.setText("Try a different category, or import/create a recipe to get started.")
+            self._empty_action.setVisible(False)
+        self._content_stack.setCurrentIndex(self._EMPTY)
+
+    def _clear_filter(self) -> None:
+        self._search.clear()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # Defer so the list viewport has its final size before we measure it
+        QTimer.singleShot(0, self._relayout_grid)
+
+    def _relayout_grid(self):
+        vw = self._list.viewport().width()
+        if vw <= 0:
+            return
+        sp = self._list.spacing()
+        # Qt pads `sp` on each side of every item, so each slot = CARD_W + 2*sp
+        cols = max(1, vw // (CARD_W + 2 * sp))
+        cell_w = max(1, vw // cols - 2 * sp)
+        if cell_w == self._cell_w:
+            return
+        self._cell_w = cell_w
+        self._delegate.set_cell_width(cell_w)
+        sz = QSize(cell_w, CARD_H)
+        for i in range(self._list.count()):
+            self._list.item(i).setSizeHint(sz)
 
     def set_ingredient_index(self, index):
         self._index = index
@@ -165,13 +291,14 @@ class RecipeGrid(QWidget):
     def set_back_label(self, label: str):
         """Show a back button with the given label, or hide it if label is empty."""
         if label:
-            self._back_btn.setText(f"← {label}")
+            self._back_btn.setText(label if self._back_icon else f"← {label}")
             self._back_btn.setVisible(True)
         else:
             self._back_btn.setVisible(False)
 
     def set_recipes(self, recipes: list[RecipeSummary]):
         self._all = recipes
+        self._bar_widget.setVisible(True)
         self._apply_filter()
 
     def _apply_filter(self):
@@ -210,10 +337,15 @@ class RecipeGrid(QWidget):
             item.setData(_ROLE_DATE, date)
             if r.recipe_id in self._thumb_cache:
                 item.setData(_ROLE_THUMB, self._thumb_cache[r.recipe_id])
-            item.setSizeHint(QSize(CARD_W, CARD_H))
+            item.setSizeHint(QSize(self._cell_w, CARD_H))
             self._list.addItem(item)
         n = self._list.count()
         self._count_label.setText(f"{n} recipe{'s' if n != 1 else ''}")
+        if n == 0:
+            self._show_empty(self._search.text().strip())
+        else:
+            self._content_stack.setCurrentIndex(self._CONTENT)
+        QTimer.singleShot(0, self._relayout_grid)
 
     def set_thumbnail(self, recipe_id: int, data: bytes):
         px = QPixmap()
@@ -271,10 +403,11 @@ class RecipeGrid(QWidget):
         item = QListWidgetItem(summary.name)
         item.setData(_ROLE_ID, summary.recipe_id)
         item.setData(_ROLE_DATE, "")
-        item.setSizeHint(QSize(CARD_W, CARD_H))
+        item.setSizeHint(QSize(self._cell_w, CARD_H))
         self._list.addItem(item)
         n = self._list.count()
         self._count_label.setText(f"{n} recipe{'s' if n != 1 else ''}")
+        self._content_stack.setCurrentIndex(self._CONTENT)
 
     def recipe_ids(self) -> list[int]:
         return [r.recipe_id for r in self._all]

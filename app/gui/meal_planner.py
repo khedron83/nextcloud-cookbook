@@ -11,6 +11,7 @@ from PySide6.QtGui import QFont, QDrag, QPixmap
 
 from app.models import RecipeSummary
 from app.workers import Worker
+from app.gui.icons import theme_icon
 
 _MEALS   = ["Breakfast", "Lunch", "Dinner"]
 _MIME    = "application/x-mealcell"
@@ -138,8 +139,8 @@ class MealCell(QFrame):
         " background: palette(base); }"
     )
     _STYLE_HOVER = (
-        "MealCell { border: 2px solid #2563eb; border-radius: 5px;"
-        " background: #1d3461; }"
+        "MealCell { border: 2px solid palette(highlight); border-radius: 5px;"
+        " background: palette(alternateBase); }"
     )
 
     def __init__(self, day: date, meal: str, parent=None):
@@ -167,7 +168,7 @@ class MealCell(QFrame):
         self._img = QLabel()
         self._img.setFixedSize(_THUMB_W, _THUMB_H)
         self._img.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._img.setStyleSheet("background: #1e2a3a; border-radius: 4px;")
+        self._img.setStyleSheet("background: palette(alternateBase); border-radius: 4px;")
         self._img.setVisible(False)
         layout.addWidget(self._img, alignment=Qt.AlignmentFlag.AlignHCenter)
 
@@ -186,11 +187,16 @@ class MealCell(QFrame):
         self._add_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self._add_btn.clicked.connect(lambda: self.assign_requested.emit(self._day, self._meal))
 
-        self._rm_btn = QPushButton("✕")
+        self._rm_btn = QPushButton()
+        _rm_icon = theme_icon("list-remove", "edit-delete")
+        if _rm_icon:
+            self._rm_btn.setIcon(_rm_icon)
+        else:
+            self._rm_btn.setText("✕")
         self._rm_btn.setStyleSheet(
-            "QPushButton { font-size: 10px; padding: 2px 6px; color: #c0392b;"
+            "QPushButton { font-size: 10px; padding: 2px 6px; color: palette(placeholderText);"
             " border: none; background: transparent; }"
-            "QPushButton:hover { background: palette(alternateBase); }"
+            "QPushButton:hover { color: palette(windowText); background: palette(alternateBase); }"
         )
         self._rm_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self._rm_btn.clicked.connect(self._remove)
@@ -390,9 +396,21 @@ class MealPlannerView(QWidget):
         outer.setSpacing(10)
 
         nav = QHBoxLayout()
-        prev_btn = QPushButton("← Prev")
+        prev_icon = theme_icon("go-previous", "arrow-left")
+        next_icon = theme_icon("go-next", "arrow-right")
+        prev_btn = QPushButton()
+        if prev_icon:
+            prev_btn.setIcon(prev_icon)
+            prev_btn.setText("Prev")
+        else:
+            prev_btn.setText("← Prev")
         prev_btn.clicked.connect(self._prev_week)
-        next_btn = QPushButton("Next →")
+        next_btn = QPushButton()
+        if next_icon:
+            next_btn.setIcon(next_icon)
+            next_btn.setText("Next")
+        else:
+            next_btn.setText("Next →")
         next_btn.clicked.connect(self._next_week)
         self._week_lbl = QLabel()
         f = self._week_lbl.font(); f.setBold(True); f.setPointSize(13)

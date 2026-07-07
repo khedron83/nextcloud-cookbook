@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew compileDebugKotlin)",
+      "Bash(git -C /home/kane/Nextcloud/Documents/Code/nextcloud-cookbook-android status)",
+      "Bash(git -C /home/kane/Nextcloud/Documents/Code/nextcloud-cookbook-android log --oneline -5)",
+      "Bash(git *)"
+    ]
+  }
+}

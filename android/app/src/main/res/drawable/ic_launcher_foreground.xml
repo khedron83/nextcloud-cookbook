@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Plate disc -->
+    <path
+        android:fillColor="#162438"
+        android:pathData="M54,17 m-40,0 a40,40 0 1,0 80,0 a40,40 0 1,0 -80,0"/>
+    <!-- Plate rim -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#3b82f6"
+        android:strokeWidth="1.4"
+        android:strokeAlpha="0.28"
+        android:pathData="M54,17 m-40,0 a40,40 0 1,0 80,0 a40,40 0 1,0 -80,0"/>
+
+    <!-- Fork tines -->
+    <path
+        android:fillColor="#DCE8F5"
+        android:pathData="M22,13 Q20,13 20,15 L20,35 Q20,37 22,37 L24,37 Q26,37 26,35 L26,15 Q26,13 24,13 Z"/>
+    <path
+        android:fillColor="#DCE8F5"
+        android:pathData="M29,13 Q27,13 27,15 L27,35 Q27,37 29,37 L31,37 Q33,37 33,35 L33,15 Q33,13 31,13 Z"/>
+    <path
+        android:fillColor="#DCE8F5"
+        android:pathData="M36,13 Q34,13 34,15 L34,35 Q34,37 36,37 L38,37 Q40,37 40,35 L40,15 Q40,13 38,13 Z"/>
+
+    <!-- Fork neck + handle -->
+    <path
+        android:fillColor="#DCE8F5"
+        android:pathData="M20,36 Q19,46 27,49 L27,94 Q27,96 28,96 L32,96 Q33,96 33,94 L33,49 Q41,46 40,36 Z"/>
+
+    <!-- Knife blade -->
+    <path
+        android:fillColor="#DCE8F5"
+        android:pathData="M60,13 L78,13 C84,23 84,42 78,51 L60,51 Z"/>
+
+    <!-- Knife bolster -->
+    <path
+        android:fillColor="#DCE8F5"
+        android:pathData="M60,51 L82,51 L82,55 L60,55 Z"/>
+
+    <!-- Knife handle -->
+    <path
+        android:fillColor="#DCE8F5"
+        android:pathData="M64,55 Q60,55 60,59 L60,92 Q60,96 64,96 L76,96 Q80,96 80,92 L80,59 Q80,55 76,55 Z"/>
+
+</vector>
